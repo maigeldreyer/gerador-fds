@@ -1,0 +1,79 @@
+{
+  "_comentario": "Biblioteca de dados compartilhada entre a versão Python e a versão PHP do gerador de FDS. Contém apenas dados tabulares (textos de códigos H/P, mapeamentos categoria->H e H->P) — a lógica de precedência de pictogramas/palavra de advertência e as frases padrão por seção ficam no código de cada versão (gerador_fds.py / GeradorFds.php), espelhadas uma da outra. Os mapeamentos H->P são uma curadoria razoável baseada nas combinações mais comuns do GHS/Purple Book e nos dois modelos de referência do usuário — não substituem a revisão humana antes de finalizar uma FDS real.",
+
+  "h_codes": {
+    "H300": "Fatal se ingerido",
+    "H301": "Tóxico se ingerido",
+    "H302": "Nocivo se ingerido",
+    "H310": "Fatal em contato com a pele",
+    "H311": "Tóxico em contato com a pele",
+    "H312": "Nocivo em contato com a pele",
+    "H330": "Fatal se inalado",
+    "H331": "Tóxico se inalado",
+    "H332": "Nocivo se inalado",
+    "H314": "Provoca queimadura severa à pele e lesões oculares graves",
+    "H315": "Provoca irritação à pele",
+    "H316": "Provoca irritação branda à pele",
+    "H318": "Provoca lesões oculares graves",
+    "H319": "Provoca irritação ocular grave"
+  },
+
+  "p_codes": {
+    "P101": "Se for necessário consultar um médico, tenha em mãos a embalagem ou o rótulo do produto",
+    "P102": "Mantenha fora do alcance das crianças",
+    "P103": "Leia o rótulo antes de utilizar",
+    "P260": "Não inale poeiras/fumos/gases/névoas/vapores/aerossóis",
+    "P261": "Evite inalar poeiras/fumos/gases/névoas/vapores/aerossóis",
+    "P262": "Evite contato com os olhos, pele ou roupas",
+    "P264": "Lave cuidadosamente após o manuseio",
+    "P270": "Não coma, beba ou fume durante a utilização deste produto",
+    "P271": "Utilize apenas ao ar livre ou em locais bem ventilados",
+    "P280": "Use luvas de proteção, roupa de proteção, proteção ocular e proteção facial",
+    "P284": "Use proteção respiratória",
+    "P311": "Contate um CENTRO DE INFORMAÇÃO TOXICOLÓGICA ou um médico",
+    "P320": "Tratamento específico urgente (ver instruções adicionais no rótulo/nesta FDS)",
+    "P301+P310": "EM CASO DE INGESTÃO: Contate imediatamente um CENTRO DE INFORMAÇÃO TOXICOLÓGICA ou um médico",
+    "P301+P330+P331": "EM CASO DE INGESTÃO: Enxágue a boca. NÃO provoque vômito",
+    "P302+P352": "EM CASO DE CONTATO COM A PELE: Lave com água e sabão em abundância",
+    "P303+P361+P353": "SE ENTRAR EM CONTATO COM A PELE (ou cabelo): Retire imediatamente toda a roupa contaminada. Enxágue a pele com água/tome uma ducha",
+    "P304+P340": "EM CASO DE INALAÇÃO: Remova a pessoa para local ventilado e a mantenha em repouso numa posição que não dificulte a respiração",
+    "P305+P351+P338": "EM CASO DE CONTATO COM OS OLHOS: Enxágue cuidadosamente com água durante vários minutos. Remova as lentes de contato, se presentes e fácil de fazer. Continue enxaguando",
+    "P310": "Contate imediatamente um CENTRO DE INFORMAÇÃO TOXICOLÓGICA ou um médico",
+    "P312": "Caso sinta indisposição, contate um CENTRO DE INFORMAÇÃO TOXICOLÓGICA ou um médico",
+    "P321": "Tratamento específico deve ser indicado por um médico de acordo com a reação do paciente",
+    "P322": "Medidas específicas devem ser indicadas por um médico (ver informações adicionais no rótulo/nesta FDS)",
+    "P330": "Enxágue a boca",
+    "P332+P313": "Em caso de irritação da pele: Consulte um médico",
+    "P337+P313": "Se a irritação ocular persistir: Consulte um médico",
+    "P362+P364": "Retire toda a roupa contaminada e lave-a antes de usá-la novamente",
+    "P363": "Lave a roupa contaminada antes de usá-la novamente",
+    "P403+P233": "Armazene em local bem ventilado. Mantenha o recipiente bem fechado",
+    "P405": "Armazene em local fechado à chave",
+    "P501": "Descarte o conteúdo e o recipiente conforme regulamentação local"
+  },
+
+  "mapa_categoria_h": {
+    "toxicidade_oral": {"1": "H300", "2": "H300", "3": "H301", "4": "H302"},
+    "toxicidade_dermica": {"1": "H310", "2": "H310", "3": "H311", "4": "H312"},
+    "toxicidade_inalatoria": {"1": "H330", "2": "H330", "3": "H331", "4": "H332"},
+    "pele": {"1A": "H314", "1B": "H314", "1C": "H314", "1": "H314", "2": "H315", "3": "H316"},
+    "olhos": {"1": "H318", "2A": "H319", "2B": "H319", "2": "H319"}
+  },
+
+  "mapa_h_para_p": {
+    "H300": ["P264", "P270", "P301+P310", "P321", "P330", "P405", "P501"],
+    "H301": ["P264", "P270", "P301+P310", "P321", "P330", "P405", "P501"],
+    "H302": ["P264", "P270", "P301+P310", "P330", "P501"],
+    "H310": ["P262", "P264", "P270", "P280", "P302+P352", "P312", "P321", "P322", "P361+P364", "P405", "P501"],
+    "H311": ["P262", "P264", "P270", "P280", "P302+P352", "P312", "P321", "P322", "P361+P364", "P405", "P501"],
+    "H312": ["P262", "P264", "P270", "P280", "P302+P352", "P312", "P321", "P362+P364", "P501"],
+    "H330": ["P260", "P271", "P284", "P304+P340", "P310", "P320", "P403+P233", "P405", "P501"],
+    "H331": ["P261", "P271", "P304+P340", "P311", "P321", "P403+P233", "P501"],
+    "H332": ["P261", "P271", "P304+P340", "P312", "P403+P233", "P501"],
+    "H314": ["P260", "P264", "P280", "P301+P330+P331", "P303+P361+P353", "P304+P340", "P305+P351+P338", "P310", "P321", "P363", "P405", "P501"],
+    "H315": ["P264", "P280", "P302+P352", "P321", "P332+P313", "P362+P364"],
+    "H316": ["P264", "P280", "P302+P352", "P332+P313"],
+    "H318": ["P264", "P280", "P305+P351+P338", "P310"],
+    "H319": ["P264", "P280", "P305+P351+P338", "P337+P313"]
+  }
+}

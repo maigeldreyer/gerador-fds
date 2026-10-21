@@ -1,0 +1,10 @@
+{
+    "name": "usuario/gerador-fds-php",
+    "description": "Gerador de FDS (ABNT NBR 14725:2023) - versao PHP",
+    "type": "project",
+    "require": {
+        "php": ">=8.1",
+        "phpoffice/phpspreadsheet": "^2.0",
+        "dompdf/dompdf": "^2.0"
+    }
+}

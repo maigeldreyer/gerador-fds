@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gerador de FDS — NBR 14725</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+
+  :root {
+    --paper: #f4f1ea;
+    --paper-raised: #fbfaf6;
+    --ink: #1e1c18;
+    --ink-soft: #56514a;
+    --ink-faint: #948d80;
+    --line: #d8d2c4;
+    --line-strong: #b9b09d;
+    --accent: #2f4d47;
+    --accent-soft: #e4e9e2;
+    --accent-contrast: #f4f1ea;
+    --flag: #a8531f;
+    --flag-soft: #f2e2d4;
+    --danger: #a3311a;
+    --focus: #2f4d47;
+
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #17181a;
+      --paper-raised: #1f2123;
+      --ink: #eeece5;
+      --ink-soft: #b7b2a6;
+      --ink-faint: #7d7870;
+      --line: #35373a;
+      --line-strong: #46484b;
+      --accent: #86a89c;
+      --accent-soft: #24302c;
+      --accent-contrast: #12211c;
+      --flag: #d18a5e;
+      --flag-soft: #2f2721;
+      --danger: #d67059;
+      --focus: #86a89c;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #17181a;
+    --paper-raised: #1f2123;
+    --ink: #eeece5;
+    --ink-soft: #b7b2a6;
+    --ink-faint: #7d7870;
+    --line: #35373a;
+    --line-strong: #46484b;
+    --accent: #86a89c;
+    --accent-soft: #24302c;
+    --accent-contrast: #12211c;
+    --flag: #d18a5e;
+    --flag-soft: #2f2721;
+    --danger: #d67059;
+    --focus: #86a89c;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    scroll-padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  body {
+    min-height: 100%;
+    padding: 48px 20px 96px;
+  }
+
+  .sheet {
+    max-width: 760px;
+    margin: 0 auto;
+  }
+
+  .masthead {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 24px;
+    border-bottom: 1px solid var(--line-strong);
+    padding-bottom: 20px;
+    margin-bottom: 40px;
+  }
+
+  .masthead-title {
+    font-family: 'Source Serif 4', serif;
+    font-weight: 600;
+    font-size: 30px;
+    line-height: 1.15;
+    margin: 0 0 6px;
+    letter-spacing: -0.01em;
+  }
+
+  .masthead-sub {
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 14px;
+  }
+
+  .masthead-ref {
+    text-align: right;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-faint);
+    line-height: 1.6;
+    white-space: nowrap;
+  }
+
+  .section {
+    margin-bottom: 40px;
+  }
+
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+
+  .section-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    color: var(--ink-faint);
+    border: 1px solid var(--line-strong);
+    border-radius: 3px;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+  }
+
+  .section-title {
+    font-family: 'Source Serif 4', serif;
+    font-size: 19px;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .section-hint {
+    margin: 4px 0 0 40px;
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+    max-width: 58ch;
+  }
+
+  .field-grid {
+    margin-left: 40px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .field.full { grid-column: 1 / -1; }
+
+  label {
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+
+  label .req {
+    color: var(--flag);
+    margin-left: 2px;
+  }
+
+  input[type="text"], input[type="number"] {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14.5px;
+    color: var(--ink);
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 10px 12px;
+    width: 100%;
+  }
+
+  input::placeholder { color: var(--ink-faint); }
+
+  input:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
+    border-color: var(--focus);
+  }
+
+  .radio-group {
+    display: flex;
+    gap: 20px;
+    padding-top: 2px;
+  }
+
+  .radio-option {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 14.5px;
+    color: var(--ink);
+    cursor: pointer;
+  }
+
+  .radio-option input[type="radio"] {
+    accent-color: var(--accent);
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+  }
+
+  .field-note {
+    margin: 2px 0 0;
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    line-height: 1.5;
+  }
+
+  /* composition table */
+
+  .comp-wrap {
+    margin-left: 40px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--paper-raised);
+  }
+
+  table.comp {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .comp thead th {
+    text-align: left;
+    font-weight: 500;
+    font-size: 12px;
+    color: var(--ink-soft);
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+    background: var(--accent-soft);
+  }
+
+  .comp thead th.center { text-align: center; }
+  .comp thead th small {
+    display: block;
+    font-weight: 400;
+    color: var(--ink-faint);
+    font-size: 11px;
+    margin-top: 2px;
+  }
+
+  .comp tbody td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: middle;
+  }
+
+  .comp tbody tr:last-child td { border-bottom: none; }
+
+  .comp input[type="text"], .comp input[type="number"] {
+    border: 1px solid transparent;
+    background: transparent;
+    padding: 8px 8px;
+    border-radius: 4px;
+  }
+
+  .comp input[type="text"]:hover, .comp input[type="number"]:hover {
+    border-color: var(--line);
+  }
+
+  .comp input[type="text"]:focus-visible, .comp input[type="number"]:focus-visible {
+    background: var(--paper);
+    border-color: var(--focus);
+  }
+
+  .comp .cas { font-family: 'IBM Plex Mono', monospace; font-size: 13.5px; }
+  .comp .pct { font-family: 'IBM Plex Mono', monospace; font-size: 13.5px; }
+
+  td.pct-cell { position: relative; }
+  td.pct-cell input { padding-right: 22px; text-align: right; }
+  td.pct-cell::after {
+    content: "%";
+    position: absolute;
+    right: 22px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--ink-faint);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    pointer-events: none;
+  }
+
+  .comp .secrecy { text-align: center; width: 96px; }
+  .comp .rowaction { width: 36px; text-align: center; }
+
+  .checkbox {
+    width: 17px;
+    height: 17px;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+
+  .remove-row {
+    background: none;
+    border: none;
+    color: var(--ink-faint);
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+    padding: 4px;
+    border-radius: 4px;
+  }
+  .remove-row:hover { color: var(--danger); background: var(--flag-soft); }
+
+  .comp-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 14px;
+    background: var(--accent-soft);
+    border-top: 1px solid var(--line);
+  }
+
+  .add-row {
+    background: none;
+    border: 1px dashed var(--line-strong);
+    color: var(--ink-soft);
+    font-size: 13px;
+    padding: 7px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'IBM Plex Sans', sans-serif;
+  }
+  .add-row:hover { border-color: var(--accent); color: var(--accent); }
+
+  .total-readout {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    color: var(--ink-soft);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .total-readout strong {
+    font-size: 14px;
+    color: var(--ink);
+  }
+
+  .total-readout.warn strong { color: var(--flag); }
+  .total-readout.ok strong { color: var(--accent); }
+
+  .comp-note {
+    margin: 10px 0 0 40px;
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    line-height: 1.5;
+  }
+
+  /* footer / submit */
+
+  .submit-row {
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line-strong);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    text-align: center;
+  }
+
+  .submit-method {
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    max-width: 46ch;
+    line-height: 1.5;
+  }
+
+  button.generate {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-weight: 500;
+    font-size: 15px;
+    color: var(--accent-contrast);
+    background: var(--accent);
+    border: none;
+    padding: 14px 32px;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  button.generate:hover { filter: brightness(1.08); }
+  button.generate:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  button.generate:disabled { opacity: 0.6; cursor: progress; }
+
+  .connection-error {
+    display: none;
+    max-width: 52ch;
+    font-size: 13px;
+    color: var(--danger);
+    background: var(--flag-soft);
+    border: 1px solid var(--flag);
+    border-radius: 6px;
+    padding: 12px 14px;
+    line-height: 1.5;
+    text-align: left;
+  }
+  .connection-error.visible { display: block; }
+  .connection-error code {
+    font-family: 'IBM Plex Mono', monospace;
+    background: rgba(0,0,0,0.06);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  .results {
+    display: none;
+    margin-top: 40px;
+    padding-top: 32px;
+    border-top: 1px solid var(--line-strong);
+  }
+  .results.visible { display: block; }
+
+  .results-title {
+    font-family: 'Source Serif 4', serif;
+    font-size: 19px;
+    font-weight: 600;
+    margin: 0 0 18px;
+  }
+
+  .hazard-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--paper-raised);
+    margin-bottom: 12px;
+  }
+
+  .hazard-name {
+    font-size: 14px;
+    color: var(--ink);
+    font-weight: 500;
+    margin: 0 0 3px;
+  }
+
+  .hazard-criterio {
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    margin: 0;
+  }
+
+  .hazard-categoria {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    white-space: nowrap;
+    flex: none;
+  }
+
+  .hazard-categoria.classificado {
+    background: var(--flag-soft);
+    color: var(--flag);
+    font-weight: 500;
+  }
+
+  .hazard-categoria.nao-classificado {
+    background: var(--accent-soft);
+    color: var(--ink-soft);
+  }
+
+  .avisos-box {
+    margin-top: 18px;
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--accent-soft);
+  }
+
+  .avisos-box-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink);
+    margin: 0 0 8px;
+  }
+
+  .avisos-box ul {
+    margin: 0;
+    padding-left: 18px;
+  }
+
+  .avisos-box li {
+    font-size: 13px;
+    color: var(--ink-soft);
+    line-height: 1.6;
+    margin-bottom: 4px;
+  }
+
+  @media (max-width: 640px) {
+    .field-grid { grid-template-columns: 1fr; margin-left: 0; }
+    .section-hint, .comp-wrap, .comp-note { margin-left: 0; }
+    .masthead { flex-direction: column; align-items: flex-start; }
+    .masthead-ref { text-align: left; }
+    .comp thead th:nth-child(2) { display: none; }
+    .comp tbody td:nth-child(2) { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="sheet">
+
+  <div class="masthead">
+    <div>
+      <p class="masthead-title">Gerador de FDS</p>
+      <p class="masthead-sub">Classificação de misturas por cálculo determinístico (GHS / CLP)</p>
+    </div>
+    <div class="masthead-ref">
+      ABNT NBR 14725:2023<br>
+      GHS Rev. 7
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <span class="section-num">🏢</span>
+      <h2 class="section-title">Dados do fornecedor</h2>
+    </div>
+    <p class="section-hint">Ficam salvos como um "perfil" reaproveitável — selecione um perfil já salvo ou preencha os campos e clique em Salvar perfil. Estes dados vão para a Seção 1 da FDS.</p>
+    <div class="field-grid">
+      <div class="field full">
+        <label for="perfil-select">Perfil salvo</label>
+        <select id="perfil-select">
+          <option value="">— Novo perfil —</option>
+        </select>
+      </div>
+      <div class="field full">
+        <label for="emp-razao-social">Razão social<span class="req">*</span></label>
+        <input type="text" id="emp-razao-social" placeholder="Ex.: Minha Empresa Química Ltda.">
+      </div>
+      <div class="field">
+        <label for="emp-cnpj">CNPJ</label>
+        <input type="text" id="emp-cnpj" placeholder="00.000.000/0001-00">
+      </div>
+      <div class="field">
+        <label for="emp-telefone">Telefone</label>
+        <input type="text" id="emp-telefone" placeholder="(11) 0000-0000">
+      </div>
+      <div class="field full">
+        <label for="emp-endereco">Endereço</label>
+        <input type="text" id="emp-endereco" placeholder="Rua, número, cidade/UF">
+      </div>
+      <div class="field">
+        <label for="emp-email">E-mail</label>
+        <input type="text" id="emp-email" placeholder="contato@empresa.com.br">
+      </div>
+      <div class="field">
+        <label for="emp-telefone-emergencia">Telefone de emergência</label>
+        <input type="text" id="emp-telefone-emergencia" placeholder="0800-000-0000">
+      </div>
+      <div class="field full" style="flex-direction: row; gap: 10px;">
+        <button type="button" class="add-row" id="btn-salvar-perfil">Salvar perfil</button>
+        <button type="button" class="add-row" id="btn-excluir-perfil">Excluir perfil selecionado</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <span class="section-num">1</span>
+      <h2 class="section-title">Identificação do produto</h2>
+    </div>
+    <div class="field-grid">
+      <div class="field full">
+        <label for="prod-name">Nome do produto<span class="req">*</span></label>
+        <input type="text" id="prod-name" placeholder="Ex.: EasyDetergenty">
+      </div>
+      <div class="field full">
+        <label for="prod-use">Uso recomendado<span class="req">*</span></label>
+        <input type="text" id="prod-use" placeholder="Ex.: Limpeza de peças automotivas">
+      </div>
+      <div class="field full">
+        <label id="estado-fisico-label">Estado físico do produto<span class="req">*</span></label>
+        <div class="radio-group" role="radiogroup" aria-labelledby="estado-fisico-label">
+          <label class="radio-option">
+            <input type="radio" name="estado-fisico" value="liquido" checked>
+            Líquido
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="estado-fisico" value="solido_pulverulento">
+            Sólido pulverulento
+          </label>
+        </div>
+        <p class="field-note">Define a via de exposição por inalação usada no cálculo (vapor para líquidos, poeira/névoa para sólidos pulverulentos) — não é sobre odor ou volatilidade.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <span class="section-num">2</span>
+      <h2 class="section-title">Composição da mistura</h2>
+    </div>
+    <p class="section-hint">Informe a concentração de cada substância no produto final — não a pureza da matéria-prima. Ex.: Lauril éter sulfato de sódio a 27% de pureza, usado em 20% da fórmula, corresponde a 5,4% no produto acabado.</p>
+
+    <div class="comp-wrap">
+      <table class="comp">
+        <thead>
+          <tr>
+            <th style="width:38%">Substância <small>nome químico</small></th>
+            <th style="width:20%">Nº CAS</th>
+            <th class="center" style="width:16%">Concentração <small>% no produto final</small></th>
+            <th class="center secrecy">Segredo industrial</th>
+            <th class="rowaction"></th>
+          </tr>
+        </thead>
+        <tbody id="comp-body">
+        </tbody>
+      </table>
+      <div class="comp-footer">
+        <button type="button" class="add-row" id="add-row">+ Adicionar substância</button>
+        <div class="total-readout" id="total-readout">
+          Total: <strong id="total-value">0,0%</strong>
+        </div>
+      </div>
+    </div>
+    <p class="comp-note">O total deve corresponder a 100% da formulação. Substâncias marcadas como segredo industrial mantêm o nome e o Nº CAS ocultos na FDS final; a classificação de perigo permanece refletida no documento.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <span class="section-num">3</span>
+      <h2 class="section-title">Dados adicionais (opcional)</h2>
+    </div>
+    <p class="section-hint">Poucos campos, todos opcionais. O que não for preenchido aparece na FDS como "Não disponível" — o sistema nunca inventa um dado de ensaio. Preencha só o que você já sabe do produto.</p>
+    <div class="field-grid">
+      <div class="field">
+        <label for="ex-codigo-produto">Código interno do produto</label>
+        <input type="text" id="ex-codigo-produto">
+      </div>
+      <div class="field">
+        <label for="ex-numero-revisao">Número da revisão</label>
+        <input type="text" id="ex-numero-revisao" placeholder="01">
+      </div>
+      <div class="field full">
+        <label for="ex-restricoes-uso">Restrições de uso</label>
+        <input type="text" id="ex-restricoes-uso">
+      </div>
+      <div class="field">
+        <label for="ex-cor">Cor</label>
+        <input type="text" id="ex-cor">
+      </div>
+      <div class="field">
+        <label for="ex-odor">Odor</label>
+        <input type="text" id="ex-odor">
+      </div>
+      <div class="field">
+        <label for="ex-ph">pH</label>
+        <input type="text" id="ex-ph" placeholder="Ex.: 6,5 – 7,5 (solução a 1%)">
+      </div>
+      <div class="field">
+        <label for="ex-numero-onu">Número ONU (transporte)</label>
+        <input type="text" id="ex-numero-onu" placeholder="Ex.: 1760">
+      </div>
+      <div class="field">
+        <label for="ex-classe-risco">Classe de risco (transporte)</label>
+        <input type="text" id="ex-classe-risco" placeholder="Ex.: 8">
+      </div>
+      <div class="field">
+        <label for="ex-grupo-embalagem">Grupo de embalagem (transporte)</label>
+        <input type="text" id="ex-grupo-embalagem" placeholder="Ex.: II">
+      </div>
+      <div class="field full">
+        <label for="ex-regulamentacoes">Regulamentações adicionais (uma por linha)</label>
+        <input type="text" id="ex-regulamentacoes" placeholder="Opcional — some às 3 regulamentações padrão da Seção 15">
+      </div>
+    </div>
+  </div>
+
+  <div class="submit-row">
+    <div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center;">
+      <button type="button" class="generate" id="btn-calcular">Calcular classificação</button>
+      <button type="button" class="generate" id="btn-gerar-pdf">Gerar FDS em PDF</button>
+    </div>
+    <p class="submit-method">A classificação é obtida por cálculo determinístico a partir dos dados de perigo de cada substância — sem uso de IA na decisão de classificação.</p>
+    <div class="connection-error" id="connection-error">
+      Não foi possível conectar ao motor de cálculo local em <code>http://localhost:5000</code>.
+      Verifique se o servidor está rodando na sua máquina (<code>python3 api_local.py</code>)
+      e tente novamente.
+    </div>
+  </div>
+
+  <div class="results" id="results">
+    <h2 class="results-title">Resultado da classificação</h2>
+    <div id="results-body"></div>
+  </div>
+
+</div>
+
+<script>
+  const body = document.getElementById('comp-body');
+  const totalValue = document.getElementById('total-value');
+  const totalReadout = document.getElementById('total-readout');
+  let rowCount = 0;
+
+  function makeRow() {
+    rowCount += 1;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="text" placeholder="Ex.: Lauril éter sulfato de sódio"></td>
+      <td class="cas"><input type="text" placeholder="Ex.: 68891-38-3"></td>
+      <td class="pct-cell"><input type="number" class="pct" placeholder="0,0" step="0.1" min="0" max="100"></td>
+      <td class="secrecy"><input type="checkbox" class="checkbox"></td>
+      <td class="rowaction"><button type="button" class="remove-row" title="Remover linha">&times;</button></td>
+    `;
+    tr.querySelector('.pct').addEventListener('input', updateTotal);
+    tr.querySelector('.remove-row').addEventListener('click', () => {
+      tr.remove();
+      updateTotal();
+    });
+    body.appendChild(tr);
+  }
+
+  function updateTotal() {
+    const inputs = body.querySelectorAll('.pct');
+    let sum = 0;
+    inputs.forEach(i => { sum += parseFloat(i.value) || 0; });
+    totalValue.textContent = sum.toLocaleString('pt-BR', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + '%';
+    totalReadout.classList.remove('ok', 'warn');
+    if (Math.abs(sum - 100) < 0.05) {
+      totalReadout.classList.add('ok');
+    } else if (sum > 0) {
+      totalReadout.classList.add('warn');
+    }
+  }
+
+  document.getElementById('add-row').addEventListener('click', makeRow);
+
+  // seed with 4 empty rows
+  for (let i = 0; i < 4; i++) makeRow();
+
+  // --- Integração com a API local (api_local.py, http://localhost:5000) ---
+
+  const BASE_URL = 'http://localhost:5000';
+  const API_URL = BASE_URL + '/api/classificar';
+  const API_GERAR_FDS_URL = BASE_URL + '/api/gerar_fds';
+  const API_PERFIS_URL = BASE_URL + '/api/perfis';
+
+  const btnCalcular = document.getElementById('btn-calcular');
+  const btnGerarPdf = document.getElementById('btn-gerar-pdf');
+  const connectionError = document.getElementById('connection-error');
+  const resultsPanel = document.getElementById('results');
+  const resultsBody = document.getElementById('results-body');
+
+  // --- Perfis de empresa (Seção 1 — dados do fornecedor, reaproveitáveis) ---
+
+  const perfilSelect = document.getElementById('perfil-select');
+  const campoEmpRazaoSocial = document.getElementById('emp-razao-social');
+  const campoEmpCnpj = document.getElementById('emp-cnpj');
+  const campoEmpEndereco = document.getElementById('emp-endereco');
+  const campoEmpTelefone = document.getElementById('emp-telefone');
+  const campoEmpEmail = document.getElementById('emp-email');
+  const campoEmpTelefoneEmergencia = document.getElementById('emp-telefone-emergencia');
+  let perfisCarregados = [];
+
+  function limparCamposEmpresa() {
+    campoEmpRazaoSocial.value = '';
+    campoEmpCnpj.value = '';
+    campoEmpEndereco.value = '';
+    campoEmpTelefone.value = '';
+    campoEmpEmail.value = '';
+    campoEmpTelefoneEmergencia.value = '';
+  }
+
+  function preencherCamposEmpresa(perfil) {
+    campoEmpRazaoSocial.value = perfil.razao_social || '';
+    campoEmpCnpj.value = perfil.cnpj || '';
+    campoEmpEndereco.value = perfil.endereco || '';
+    campoEmpTelefone.value = perfil.telefone || '';
+    campoEmpEmail.value = perfil.email || '';
+    campoEmpTelefoneEmergencia.value = perfil.telefone_emergencia || '';
+  }
+
+  function coletarDadosEmpresa() {
+    return {
+      razao_social: campoEmpRazaoSocial.value.trim(),
+      cnpj: campoEmpCnpj.value.trim(),
+      endereco: campoEmpEndereco.value.trim(),
+      telefone: campoEmpTelefone.value.trim(),
+      email: campoEmpEmail.value.trim(),
+      telefone_emergencia: campoEmpTelefoneEmergencia.value.trim(),
+    };
+  }
+
+  async function carregarPerfis(selecionarId) {
+    try {
+      const resposta = await fetch(API_PERFIS_URL);
+      if (!resposta.ok) return;
+      perfisCarregados = await resposta.json();
+      perfilSelect.innerHTML = '<option value="">— Novo perfil —</option>' +
+        perfisCarregados.map(p => `<option value="${p.id}">${p.razao_social}</option>`).join('');
+      if (selecionarId) {
+        perfilSelect.value = selecionarId;
+      }
+    } catch (erro) {
+      // Sem servidor local ainda — a tela continua utilizável, só sem perfis salvos.
+    }
+  }
+
+  perfilSelect.addEventListener('change', () => {
+    const perfil = perfisCarregados.find(p => p.id === perfilSelect.value);
+    if (perfil) {
+      preencherCamposEmpresa(perfil);
+    } else {
+      limparCamposEmpresa();
+    }
+  });
+
+  document.getElementById('btn-salvar-perfil').addEventListener('click', async () => {
+    const dadosEmpresa = coletarDadosEmpresa();
+    if (!dadosEmpresa.razao_social) {
+      alert('Informe a razão social antes de salvar o perfil.');
+      return;
+    }
+    const perfilIdAtual = perfilSelect.value || null;
+    try {
+      const resposta = await fetch(perfilIdAtual ? `${API_PERFIS_URL}/${perfilIdAtual}` : API_PERFIS_URL, {
+        method: perfilIdAtual ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dadosEmpresa),
+      });
+      const perfilSalvo = await resposta.json();
+      if (!resposta.ok) {
+        alert('Não foi possível salvar o perfil: ' + ((perfilSalvo.detalhes || [perfilSalvo.erro]).join(' ')));
+        return;
+      }
+      await carregarPerfis(perfilSalvo.id);
+    } catch (erro) {
+      connectionError.classList.add('visible');
+    }
+  });
+
+  document.getElementById('btn-excluir-perfil').addEventListener('click', async () => {
+    const perfilIdAtual = perfilSelect.value;
+    if (!perfilIdAtual) return;
+    if (!confirm('Excluir este perfil de empresa salvo? Esta ação não afeta nenhuma FDS já gerada.')) return;
+    try {
+      await fetch(`${API_PERFIS_URL}/${perfilIdAtual}`, { method: 'DELETE' });
+      limparCamposEmpresa();
+      await carregarPerfis();
+    } catch (erro) {
+      connectionError.classList.add('visible');
+    }
+  });
+
+  carregarPerfis();
+
+  // --- Campos adicionais (Seção 3 da tela — "poucos campos" opcionais) ---
+
+  function coletarCamposExtras() {
+    const extras = {};
+    const mapa = {
+      cor: 'ex-cor',
+      odor: 'ex-odor',
+      ph: 'ex-ph',
+      numero_onu: 'ex-numero-onu',
+      classe_risco: 'ex-classe-risco',
+      grupo_embalagem: 'ex-grupo-embalagem',
+      regulamentacoes_adicionais: 'ex-regulamentacoes',
+    };
+    for (const [chave, idCampo] of Object.entries(mapa)) {
+      const valor = document.getElementById(idCampo).value.trim();
+      if (valor) extras[chave] = valor;
+    }
+    return extras;
+  }
+
+  function coletarProdutoInfo() {
+    const info = {};
+    const codigoProduto = document.getElementById('ex-codigo-produto').value.trim();
+    const restricoesUso = document.getElementById('ex-restricoes-uso').value.trim();
+    if (codigoProduto) info.codigo_produto = codigoProduto;
+    if (restricoesUso) info.restricoes_uso = restricoesUso;
+    return info;
+  }
+
+  const NOMES_VIA = {
+    oral: 'Toxicidade aguda — via oral',
+    dermica: 'Toxicidade aguda — via dérmica',
+    inalatoria_vapores: 'Toxicidade aguda — via inalatória (vapor)',
+    inalatoria_poeiras_nevoas: 'Toxicidade aguda — via inalatória (poeira/névoa)',
+  };
+
+  function coletarComposicao() {
+    const linhas = Array.from(body.querySelectorAll('tr'));
+    return linhas.map(tr => {
+      return {
+        nome: tr.querySelector('td:nth-child(1) input').value.trim(),
+        cas: tr.querySelector('td:nth-child(2) input').value.trim(),
+        concentracao: tr.querySelector('td:nth-child(3) input').value,
+        segredo_industrial: tr.querySelector('td.secrecy input').checked,
+      };
+    }).filter(item => item.nome || item.cas || item.concentracao);
+  }
+
+  function renderizarCartaoPerigo(titulo, resultado) {
+    const categoria = resultado ? resultado.categoria : null;
+    const criterio = resultado ? resultado.criterio || resultado.via_decisao : null;
+    const classificado = categoria !== null && categoria !== undefined;
+    return `
+      <div class="hazard-card">
+        <div>
+          <p class="hazard-name">${titulo}</p>
+          <p class="hazard-criterio">${classificado ? (criterio || '') : 'Não classificado com os dados informados'}</p>
+        </div>
+        <div class="hazard-categoria ${classificado ? 'classificado' : 'nao-classificado'}">
+          ${classificado ? 'Categoria ' + categoria : 'NC'}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderizarResultados(dados) {
+    let html = '';
+
+    for (const [via, resultado] of Object.entries(dados.toxicidade_aguda || {})) {
+      const titulo = NOMES_VIA[via] || via;
+      html += renderizarCartaoPerigo(titulo, resultado);
+      if (resultado.declaracao_obrigatoria) {
+        html += `<p class="hazard-criterio" style="margin:-6px 0 12px 16px;">⚠ ${resultado.declaracao_obrigatoria}</p>`;
+      }
+    }
+
+    html += renderizarCartaoPerigo('Corrosão/irritação à pele', dados.corrosao_irritacao_pele);
+    html += renderizarCartaoPerigo('Lesão ocular grave/irritação ocular', dados.lesao_ocular);
+
+    if (dados.avisos && dados.avisos.length) {
+      html += `
+        <div class="avisos-box">
+          <p class="avisos-box-title">Avisos — revisar antes de finalizar a FDS</p>
+          <ul>${dados.avisos.map(a => `<li>${a}</li>`).join('')}</ul>
+        </div>
+      `;
+    }
+
+    resultsBody.innerHTML = html;
+    resultsPanel.classList.add('visible');
+  }
+
+  async function calcularClassificacao() {
+    connectionError.classList.remove('visible');
+    resultsPanel.classList.remove('visible');
+
+    const nomeProduto = document.getElementById('prod-name').value.trim();
+    const usoRecomendado = document.getElementById('prod-use').value.trim();
+    const estadoFisico = document.querySelector('input[name="estado-fisico"]:checked').value;
+    const composicao = coletarComposicao();
+
+    btnCalcular.disabled = true;
+    btnCalcular.textContent = 'Calculando…';
+
+    try {
+      const resposta = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nome_produto: nomeProduto,
+          uso_recomendado: usoRecomendado,
+          estado_fisico: estadoFisico,
+          composicao: composicao,
+        }),
+      });
+
+      const dados = await resposta.json();
+
+      if (!resposta.ok) {
+        const detalhes = (dados.detalhes || [dados.erro || 'Erro desconhecido.']).join(' ');
+        resultsBody.innerHTML = `<div class="avisos-box"><p class="avisos-box-title">Não foi possível calcular</p><ul><li>${detalhes}</li></ul></div>`;
+        resultsPanel.classList.add('visible');
+        return;
+      }
+
+      renderizarResultados(dados);
+    } catch (erro) {
+      connectionError.classList.add('visible');
+    } finally {
+      btnCalcular.disabled = false;
+      btnCalcular.textContent = 'Calcular classificação';
+    }
+  }
+
+  btnCalcular.addEventListener('click', calcularClassificacao);
+
+  // --- Geração da FDS completa em PDF (/api/gerar_fds) ---
+
+  function montarPayloadFds() {
+    return {
+      nome_produto: document.getElementById('prod-name').value.trim(),
+      estado_fisico: document.querySelector('input[name="estado-fisico"]:checked').value,
+      composicao: coletarComposicao(),
+      perfil_empresa: coletarDadosEmpresa(),
+      produto_info: Object.assign(
+        { uso_recomendado: document.getElementById('prod-use').value.trim() },
+        coletarProdutoInfo()
+      ),
+      campos_extras: coletarCamposExtras(),
+      numero_revisao: document.getElementById('ex-numero-revisao').value.trim() || '01',
+    };
+  }
+
+  async function gerarFdsPdf() {
+    connectionError.classList.remove('visible');
+    resultsPanel.classList.remove('visible');
+
+    btnGerarPdf.disabled = true;
+    btnGerarPdf.textContent = 'Gerando PDF…';
+
+    try {
+      const resposta = await fetch(API_GERAR_FDS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(montarPayloadFds()),
+      });
+
+      const tipoConteudo = resposta.headers.get('Content-Type') || '';
+
+      if (!resposta.ok || tipoConteudo.includes('application/json')) {
+        const dados = await resposta.json();
+        const detalhes = (dados.detalhes || [dados.erro || 'Erro desconhecido.']).join(' ');
+        resultsBody.innerHTML = `<div class="avisos-box"><p class="avisos-box-title">Não foi possível gerar a FDS em PDF</p><ul><li>${detalhes}</li></ul></div>`;
+        resultsPanel.classList.add('visible');
+        return;
+      }
+
+      const blob = await resposta.blob();
+      const nomeArquivo = (document.getElementById('prod-name').value.trim() || 'FDS').replace(/[^\w-]+/g, '_') + '.pdf';
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'FDS_' + nomeArquivo;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (erro) {
+      connectionError.classList.add('visible');
+    } finally {
+      btnGerarPdf.disabled = false;
+      btnGerarPdf.textContent = 'Gerar FDS em PDF';
+    }
+  }
+
+  btnGerarPdf.addEventListener('click', gerarFdsPdf);
+</script>
+
+</body>
+</html>
