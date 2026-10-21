@@ -1,0 +1,46 @@
+# --- Dados de origem protegidos por direitos autorais / termos de uso ---
+# Nunca versionar: são conteúdo comprado (ABNT) ou de redistribuição
+# restrita (ECHA "unofficial" table). Mesmo em repositório privado, o
+# GitHub ainda hospedaria uma cópia desses arquivos nos servidores dele —
+# o ideal é que cada máquina obtenha esses arquivos diretamente da fonte
+# oficial (ver README.md, seção "Como preparar os dados").
+*.pdf
+nbr_full.txt
+annex_vi_clp_table_atp23_en.xlsx
+annex_vi_*.xlsx
+
+# --- Banco de dados derivado desses arquivos ---
+# Também não deve ser versionado: é gerado localmente a partir do Anexo VI
+# (banco_substancias.py -> importar_anexo_vi()) e de qualquer cadastro
+# manual seu. Cada máquina gera o seu.
+*.db
+*.sqlite
+*.sqlite3
+
+# --- Dados pessoais/cadastrais do usuário ---
+# Perfis de empresa (Seção 1 da FDS) — não são código, são dados do seu
+# negócio/clientes. Cada máquina mantém os seus. (FDS geradas em PDF já
+# caem na regra "*.pdf" mais acima.)
+perfis_empresa.json
+php/perfis_empresa.json
+
+# --- Ambiente Python ---
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# --- Ambiente PHP ---
+php/vendor/
+composer.lock
+
+# --- Logs e artefatos de execução local ---
+*.log
+nohup.out
+
+# --- Sistema operacional / editor ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
