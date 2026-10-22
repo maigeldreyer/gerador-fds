@@ -1,171 +1,158 @@
 # Gerador de FDS — ABNT NBR 14725:2023
 
-Sistema para classificar misturas químicas (líquidos e sólidos pulverulentos) por
-cálculo determinístico — sem uso de IA na decisão de classificação — e apoiar a
-elaboração da FDS (Ficha de Dados de Segurança) conforme a ABNT NBR 14725:2023.
+Classifica misturas químicas (líquidos e sólidos pulverulentos) por cálculo
+determinístico — sem uso de IA na decisão de classificação — e gera a Ficha de
+Dados de Segurança completa (16 seções) em PDF, conforme a ABNT NBR 14725:2023.
 
-Uso pessoal / privado. Este repositório não inclui os arquivos de dados de origem
-(ver abaixo o motivo e como obtê-los).
+**Acesso:** https://maigeldreyer.github.io/gerador-fds/gerador-fds.html
+(exige login).
 
-**Versão 100% front-end.** Todo o motor de cálculo, o banco de substâncias e a
-geração do PDF da FDS rodam inteiramente no navegador — não há mais servidor
-Python ou PHP. Nada do que você digita ou importa (composição, dados da empresa,
-Anexo VI) sai do seu navegador: tudo fica em `IndexedDB`/`localStorage` locais.
+Não há servidor de aplicação: cálculo, base de substâncias e geração do PDF
+rodam no navegador. O único serviço externo é o de login (ver
+[Login e usuários](#login-e-usuários)).
 
-## Estrutura
+## Como usar
+
+1. Entre com usuário e senha. Marque **"Manter conectado neste navegador"** para
+   não precisar entrar de novo.
+2. A base de substâncias (Anexo VI) carrega sozinha no primeiro acesso — leva
+   alguns segundos. O card **"Base de dados de substâncias"** mostra quantas
+   foram carregadas. Nas visitas seguintes ela já está pronta.
+3. Preencha **nome**, **uso recomendado** e **estado físico** do produto.
+4. Informe a **composição**: nome, **Nº CAS** (obrigatório — a classificação é
+   buscada pelo CAS) e concentração no produto final. A soma precisa dar 100%.
+   Marque "Segredo industrial" para ocultar nome e CAS na FDS.
+5. Opcionalmente, preencha os **dados adicionais**: número da revisão, pH, dados
+   de transporte (Nº ONU, classe de risco, grupo de embalagem) e regulamentações
+   adicionais.
+6. **"Calcular classificação"** mostra o resultado na tela; **"Gerar FDS em
+   PDF"** baixa a ficha completa.
+
+Os dados do fornecedor (Seção 1 da FDS) são preenchidos automaticamente a
+partir do login.
+
+## Onde fica cada dado
+
+| Dado | Onde fica |
+|---|---|
+| Composição / fórmula do produto | Só no formulário aberto. Não é salva em lugar nenhum nem enviada para fora do navegador. |
+| Dados da empresa (Seção 1) | Planilha privada no Google, lida a cada login. Não ficam neste repositório nem gravados no navegador. |
+| Usuários e senhas | Mesma planilha privada (senhas guardadas só como hash). |
+| Base de substâncias | `js/anexo_vi_compacto.json` neste repositório, copiada para o `IndexedDB` do navegador no primeiro acesso. |
+| Sessão de login | Token em `sessionStorage` (ou `localStorage`, com "Manter conectado"). |
+
+## Base de substâncias (Anexo VI)
+
+A classificação de cada matéria-prima vem do Anexo VI do Regulamento CLP
+(tabela de classificações harmonizadas da ECHA), já embutida no repositório:
+
+- Arquivo: `js/anexo_vi_compacto.json` — versão **ATP23 (Reg. (UE) 2025/1222)**,
+  3.857 linhas com CAS (3.823 substâncias distintas). Linhas da ECHA sem Nº CAS
+  ficam de fora, porque o sistema busca tudo pelo CAS.
+- Formato: `{ fonte, fonte_versao, campos: [cas, nome, ec, classificacao, h_codes], linhas: [[...], ...] }`.
+- No primeiro acesso a página baixa o arquivo, processa e grava no `IndexedDB`.
+  Depois só reimporta se a versão mudar.
+
+**Para atualizar para uma ATP mais nova:**
+
+1. Baixe a planilha "unofficial" mais recente em
+   https://echa.europa.eu/information-on-chemicals/annex-vi-to-clp.
+2. Gere um novo `js/anexo_vi_compacto.json` no mesmo formato (aba da ATP,
+   cabeçalho na 3ª linha; colunas *CAS No*, *Chemical Name*, *EC No*,
+   *Hazard Class and Category Code(s)* e *Classification Hazard Statement
+   Code(s)*; descartar linhas sem CAS) e atualize `fonte_versao`.
+3. Em `gerador-fds.html`, altere a constante `VERSAO_ANEXO_VI_EMBUTIDO` para o
+   mesmo valor de `fonte_versao`.
+4. Publique. Cada navegador reimporta a base sozinho na próxima visita; a
+   reimportação substitui só as linhas de origem ECHA.
+
+**Sobre a fonte:** a tabela "unofficial" da ECHA traz o aviso de que deve ser
+usada "only for informative purposes" e não reproduzida nem usada em atividades
+comerciais. Embuti-la neste repositório foi uma decisão explícita do
+responsável pelo projeto, ciente desse aviso. O texto legal do Regulamento CLP
+e de seus anexos é de reuso livre (Decisão 2011/833/UE); a planilha de
+conveniência da ECHA especificamente não é.
+
+## Login e usuários
+
+O login usa um Google Apps Script publicado como App da Web, ligado a uma
+planilha privada ("GeradorFDS — Login") com as abas `Usuarios`, `Acessos`,
+`Auditoria`, `Config` e `Empresa`. Nem a planilha nem o código do Apps Script
+estão neste repositório; `js/auth.js` só contém o endereço público do
+endpoint, que não dá acesso a nada sem usuário e senha válidos.
+
+- Senhas guardadas como hash SHA-256 com sal e várias iterações; sessões com
+  token assinado (HMAC-SHA256).
+- Bloqueio temporário após várias tentativas com senha errada (limite e
+  duração definidos na aba `Config`).
+- Administração pela própria planilha, no menu **GeradorFDS Admin**: criar
+  usuário, resetar senha, desativar/reativar usuário e encerrar sessões.
+- Cada usuário pode trocar a própria senha pelo botão **"Trocar senha"** na
+  tela.
+- Para mudar os dados do fornecedor que saem na FDS, edite a aba `Empresa` da
+  planilha.
+
+## Geração da FDS em PDF
+
+- **Seções 2, 3 e 11** (perigos, composição, toxicologia): classes de perigo
+  calculadas pelo motor — toxicidade aguda e corrosão/irritação à pele e aos
+  olhos — com frases H/P e pictogramas derivados das categorias. A Seção 3
+  mostra também a classificação de cada matéria-prima.
+- **Seções 4 a 8, 10, 12, 13 e 15**: frases padrão ajustadas pela severidade
+  calculada (corrosivo, irritante ou sem classificação).
+- **Seções 9 e 14** (propriedades físico-químicas e transporte): só o que for
+  preenchido na tela (pH, Nº ONU, classe de risco, grupo de embalagem). O
+  restante, incluindo cor e odor, sai como "Não disponível" — o sistema nunca
+  inventa dado de ensaio.
+
+## Estrutura do repositório
 
 | Arquivo | Função |
 |---|---|
-| `gerador-fds.html` | Tela única da aplicação (perfil de empresa, produto, composição, importação do Anexo VI, cálculo e geração do PDF). |
+| `gerador-fds.html` | Tela única: login, produto, composição, dados adicionais, cálculo e geração do PDF. Também dispara a carga automática da base. |
+| `js/auth.js` | Cliente de login/sessão e leitura dos dados da empresa (fala com o Apps Script). |
+| `js/bancoSubstancias.js` | Banco de substâncias em `IndexedDB`: importação do Anexo VI, resolução de múltiplas linhas por CAS e ponte com os motores. |
+| `js/anexo_vi_compacto.json` | Base do Anexo VI (ECHA) embutida. |
 | `js/motorToxicidadeAguda.js` | Motor de cálculo — toxicidade aguda (NBR 5.3.1, Tabelas 16/17). |
 | `js/motorCorrosaoIrritacao.js` | Motor de cálculo — corrosão/irritação à pele e lesão ocular (NBR 5.3.2/5.3.3, Tabelas 20/21/24/25). |
-| `js/bancoSubstancias.js` | Banco de substâncias em `IndexedDB` — importação do Anexo VI (via SheetJS), cadastro manual, resolução de múltiplas linhas por CAS. |
-| `js/geradorFds.js` | Monta as 16 seções da FDS (frases padrão + rótulo GHS derivado dos cálculos) e gera o PDF final (via jsPDF + jspdf-autotable), no layout de duas colunas rótulo/valor. |
-| `js/perfisEmpresa.js` | Perfis de empresa reaproveitáveis (Seção 1 da FDS), salvos em `localStorage`. |
-| `js/pubchemEnriquecimento.js` | Enriquecimento opcional via PubChem (`fetch`), só para substâncias sem dado no Anexo VI — nunca sobrescreve dado da ECHA. |
-| `data/dados_fds.json` | Biblioteca de dados: textos dos códigos H/P e mapeamentos categoria→H / H→P, carregada via `fetch` pela tela. |
-| `tests/teste_motores.mjs`, `tests/teste_edge.mjs` | Suíte de regressão (Node, sem navegador) dos dois motores de cálculo — casos normais e de borda. Rode com `node tests/teste_motores.mjs` / `node tests/teste_edge.mjs`. |
+| `js/geradorFds.js` | Monta as 16 seções e gera o PDF (jsPDF + jspdf-autotable). |
+| `js/pubchemEnriquecimento.js` | Consulta opcional à PubChem para substâncias sem dado no Anexo VI. Existe no código, mas não está ligada à tela. |
+| `data/dados_fds.json` | Textos das frases H/P e mapeamentos categoria→H e H→P. |
+| `tests/teste_motores.mjs`, `tests/teste_edge.mjs` | Testes de regressão dos dois motores (Node, sem navegador): `node tests/teste_motores.mjs`. |
 
-## Como rodar
+Bibliotecas externas, carregadas por CDN em versões fixas: `jspdf@2.5.2`,
+`jspdf-autotable@3.8.2` e `xlsx@0.18.5` (esta última só é usada pelo
+importador de planilha `.xlsx`, que continua no código mas não aparece na tela).
+O login e a geração do PDF exigem internet.
 
-A tela usa módulos ES (`<script type="module">`), e o Chrome/Firefox/Edge
-bloqueiam `import` de arquivos locais quando a página é aberta direto do disco
-(`file://...`) — é uma restrição de segurança do próprio navegador, não deste
-projeto. **Por isso, abra `gerador-fds.html` sempre através de um servidor**,
-nunca dando duplo clique no arquivo. Duas formas simples:
+### Rodar localmente
 
-**Opção 1 — servidor local (qualquer máquina com Python ou Node):**
+A página usa módulos ES, que o navegador bloqueia quando o arquivo é aberto
+direto do disco (`file://`). Sirva a pasta com qualquer servidor estático:
 
 ```bash
-# dentro da pasta do projeto
 python3 -m http.server 8000
-# ou: npx http-server -p 8000
+# abra http://localhost:8000/gerador-fds.html
 ```
 
-Abra `http://localhost:8000/gerador-fds.html`.
+## O que não vai para o repositório
 
-**Opção 2 — GitHub Pages:** ative o GitHub Pages deste repositório (Settings →
-Pages → Deploy from branch) e acesse a URL gerada. Como é um repositório
-privado, o Pages também fica privado/restrito aos colaboradores (dependendo do
-seu plano do GitHub).
+- **ABNT NBR 14725:2023** (PDF comprado): usada só como referência para os
+  valores técnicos do código. O texto da norma tem direitos autorais da ABNT —
+  não adicione o PDF nem extrações de texto dele.
+- **Planilha de login e código do Apps Script**: ficam só na conta Google do
+  responsável.
 
-Não é necessário instalar nada (sem `pip install`, sem `composer install`, sem
-`npm install` para a aplicação em si) — os três pacotes usados (jsPDF,
-jspdf-autotable, SheetJS/xlsx) são carregados via CDN (`<script>` no próprio
-`gerador-fds.html`), em versões fixas:
+## Limitações atuais
 
-- `jspdf@2.5.2`
-- `jspdf-autotable@3.8.2`
-- `xlsx@0.18.5`
-
-Isso significa que a geração do PDF e a importação do Anexo VI exigem conexão
-com a internet no navegador (para baixar esses três scripts); o resto da
-aplicação (cálculo de classificação, formulário, perfis de empresa) funciona
-totalmente offline depois que a página carrega.
-
-## Como preparar os dados (uma vez por navegador)
-
-O Anexo VI não vem embutido no código nem no repositório (ver "Por que os dados
-não estão no repositório", abaixo) — você importa a planilha diretamente pela
-tela:
-
-1. Baixe o Anexo VI (CLP Table 3.1) direto do site da ECHA:
-   https://echa.europa.eu/information-on-chemicals/annex-vi-to-clp (procure a
-   planilha "unofficial" mais recente — ATP em vigor).
-2. Na tela, na seção **"Base de dados de substâncias (Anexo VI)"**, escolha o
-   arquivo `.xlsx` baixado, confirme/ajuste o número da linha de cabeçalho
-   (padrão: 2) e clique em **"Importar Anexo VI"**.
-3. O arquivo é lido inteiramente no navegador (via SheetJS) e as substâncias são
-   gravadas no `IndexedDB` local — o `.xlsx` em si nunca é enviado a lugar
-   nenhum nem salvo em disco pela aplicação.
-
-A importação é idempotente: importar de novo (ex.: após baixar uma ATP mais
-nova) substitui só as linhas de origem `ECHA_ANEXO_VI`, sem afetar nenhum
-cadastro manual que você tenha feito.
-
-O `IndexedDB` é local ao navegador/perfil/máquina — se você usar outro
-navegador ou outra máquina, ou limpar os dados do site, precisará importar o
-Anexo VI novamente.
-
-## Geração da FDS completa em PDF (16 seções)
-
-Além de calcular a classificação, o sistema monta a Ficha de Dados de
-Segurança completa (as 16 seções exigidas pela ABNT NBR 14725:2023) e gera um
-PDF pronto para uso, no layout de duas colunas rótulo/valor (mesmo estilo de
-fichas como a do Fosfeed/Safeeds).
-
-O que é calculado vs. o que é preenchido:
-
-- **Seções 2 e 11** (perigos e informações toxicológicas): só mostram as
-  classes de perigo que o motor realmente calcula hoje — toxicidade aguda e
-  corrosão/irritação à pele e olhos. Frases H/P e pictogramas são derivados
-  automaticamente dessas categorias.
-- **Seções 4 a 8, 10, 12, 13 e 15** (primeiros socorros, combate a incêndio,
-  vazamento, manuseio/armazenamento, EPI, estabilidade/reatividade, informações
-  ecológicas, destinação final, regulamentações): usam frases padrão, ajustadas
-  pela severidade calculada (corrosivo/irritante/nenhum), que você pode
-  complementar com os "Dados adicionais" da tela.
-- **Seção 9** (propriedades físico-químicas) e **14** (transporte): são campos
-  manuais opcionais — o que não for preenchido aparece como "Não disponível" /
-  "Não classificado". O sistema nunca inventa um dado de ensaio.
-- **Seção 3** (composição): mostra a classificação intrínseca de cada
-  matéria-prima (a que já está no Anexo VI/banco), separada do resultado
-  calculado da mistura. Substâncias marcadas como segredo industrial têm nome e
-  CAS ocultados.
-
-**Perfis de empresa:** os dados do fornecedor (Seção 1) ficam salvos como
-perfis reaproveitáveis no `localStorage` do navegador, para você não precisar
-redigitá-los a cada produto. Como é `localStorage`, os perfis são por
-navegador/máquina — não sincronizam entre dispositivos.
-
-Na tela, use o botão **"Gerar FDS em PDF"** para baixar o documento completo.
-
-## Por que os dados não estão no repositório
-
-Dois arquivos alimentam o sistema e não são código seu:
-
-- **ABNT NBR 14725:2023** (PDF comprado) — usado só como referência para
-  extrair valores técnicos (tabelas, fórmulas, limites) para dentro do código.
-  O texto da norma em si tem direitos autorais da ABNT e não pode ser
-  redistribuído — nem o PDF, nem uma extração de texto dele.
-- **Anexo VI da ECHA** (`annex_vi_clp_table_atp23_en.xlsx`) — a própria
-  planilha "unofficial" que a ECHA disponibiliza traz o aviso: "this document
-  should be treated only for informative purposes not including commercial
-  activities or reproduction." Por precaução, nunca commite esse arquivo neste
-  repositório, mesmo sendo privado — o `.gitignore` não precisa mais ignorá-lo
-  explicitamente (a aplicação não grava mais esse arquivo em disco: ele só é
-  lido em memória, no navegador, no momento da importação), mas a regra vale
-  para você também: não adicione esse `.xlsx` nem o PDF da norma a este
-  repositório.
-
-## Limitações atuais (por escolha, não por esquecimento)
-
-- Classificação só por cálculo (método aditivo/tabelas da norma) — sem uso de
-  dados de ensaio da própria mistura, princípios de extrapolação ("bridging"),
-  nem classificação assistida por IA.
-- Hoje cobre toxicidade aguda e corrosão/irritação à pele e olhos. Outras
-  classes de perigo (CMR, toxicidade em órgão-alvo, perigo ao ambiente aquático
-  etc.) ainda não foram implementadas.
-- Produtos considerados: apenas líquidos e sólidos pulverulentos (nunca gases)
-  — a via inalatória usa sempre "vapor" ou "poeira/névoa", conforme o campo
-  "Estado físico do produto" informado na tela.
-- Quando uma substância tem mais de uma linha no Anexo VI para o mesmo CAS
-  (faixa de concentração própria ou variante de forma física) e a concentração
-  informada não permite identificar com segurança qual linha se aplica, o
-  sistema usa a classificação mais severa entre as candidatas e emite um aviso
-  explícito pedindo confirmação manual — nunca escolhe silenciosamente a mais
-  branda.
-- O enriquecimento via PubChem (`js/pubchemEnriquecimento.js`) depende de
-  `fetch` para `pubchem.ncbi.nlm.nih.gov` a partir do navegador; se o PubChem
-  bloquear CORS para chamadas diretas do navegador, essa função específica
-  pode não funcionar — ela é só um complemento opcional e nunca é exigida para
-  calcular a classificação.
-
-## Histórico
-
-Este projeto existia antes como duas versões de backend equivalentes (Python/
-Flask e PHP), servindo a mesma tela `gerador-fds.html` por `fetch`. Essas
-versões foram descontinuadas e substituídas por esta versão 100% front-end,
-que não depende de nenhum servidor de aplicação — só de um servidor estático
-qualquer (ou GitHub Pages) para contornar a restrição de `file://` dos
-módulos ES.
+- Classificação só por cálculo (método aditivo e tabelas da norma) — sem dados
+  de ensaio da própria mistura, princípios de extrapolação ("bridging") ou IA.
+- Cobre toxicidade aguda e corrosão/irritação à pele e aos olhos. Outras classes
+  (CMR, toxicidade para órgãos-alvo, perigo ao ambiente aquático etc.) ainda não
+  foram implementadas.
+- Apenas líquidos e sólidos pulverulentos (nunca gases): a via inalatória usa
+  "vapor" ou "poeira/névoa", conforme o estado físico informado.
+- Quando o Anexo VI tem mais de uma linha para o mesmo CAS e a concentração não
+  permite saber qual se aplica, o sistema usa a classificação mais severa e
+  emite um aviso pedindo confirmação manual — nunca escolhe a mais branda em
+  silêncio.

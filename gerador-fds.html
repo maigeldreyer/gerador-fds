@@ -807,24 +807,8 @@
     <p class="section-hint">Poucos campos, todos opcionais. O que não for preenchido aparece na FDS como "Não disponível" — o sistema nunca inventa um dado de ensaio. Preencha só o que você já sabe do produto.</p>
     <div class="field-grid">
       <div class="field">
-        <label for="ex-codigo-produto">Código interno do produto</label>
-        <input type="text" id="ex-codigo-produto">
-      </div>
-      <div class="field">
         <label for="ex-numero-revisao">Número da revisão</label>
         <input type="text" id="ex-numero-revisao" placeholder="01">
-      </div>
-      <div class="field full">
-        <label for="ex-restricoes-uso">Restrições de uso</label>
-        <input type="text" id="ex-restricoes-uso">
-      </div>
-      <div class="field">
-        <label for="ex-cor">Cor</label>
-        <input type="text" id="ex-cor">
-      </div>
-      <div class="field">
-        <label for="ex-odor">Odor</label>
-        <input type="text" id="ex-odor">
       </div>
       <div class="field">
         <label for="ex-ph">pH</label>
@@ -947,6 +931,10 @@
   const baseDadosStatus = document.getElementById('base-dados-status');
   const CHAVE_VERSAO_ANEXO_VI = 'gerador_fds_anexo_vi_versao';
   const URL_ANEXO_VI_DATASET = './js/anexo_vi_compacto.json';
+  // Deve ser igual ao campo "fonte_versao" de js/anexo_vi_compacto.json.
+  // Ao trocar o dataset por uma ATP nova, altere os dois: navegadores com uma
+  // versão salva diferente desta reimportam a base sozinhos na próxima visita.
+  const VERSAO_ANEXO_VI_EMBUTIDO = 'ATP23 (Reg. (UE) 2025/1222)';
 
   async function atualizarStatusBase() {
     const total = await banco.contarSubstancias();
@@ -960,7 +948,7 @@
     let versaoImportada = null;
     try { versaoImportada = localStorage.getItem(CHAVE_VERSAO_ANEXO_VI); } catch { /* ignorado */ }
 
-    if (total > 0 && versaoImportada) {
+    if (total > 0 && versaoImportada === VERSAO_ANEXO_VI_EMBUTIDO) {
       await atualizarStatusBase();
       return;
     }
@@ -971,7 +959,11 @@
       if (!resp.ok) throw new Error(`resposta ${resp.status} ao buscar o dataset embutido`);
       const dataset = await resp.json();
       await banco.importarAnexoViDeDataset(dataset);
-      try { localStorage.setItem(CHAVE_VERSAO_ANEXO_VI, dataset.fonte_versao || 'embutido'); } catch { /* ignorado */ }
+      if (dataset.fonte_versao !== VERSAO_ANEXO_VI_EMBUTIDO) {
+        console.warn(`Anexo VI: fonte_versao do JSON ("${dataset.fonte_versao}") difere de VERSAO_ANEXO_VI_EMBUTIDO ("${VERSAO_ANEXO_VI_EMBUTIDO}").`);
+      }
+      // Grava a constante (não o valor do JSON) para nunca reimportar em loop se os dois divergirem.
+      try { localStorage.setItem(CHAVE_VERSAO_ANEXO_VI, VERSAO_ANEXO_VI_EMBUTIDO); } catch { /* ignorado */ }
       await atualizarStatusBase();
     } catch (erro) {
       baseDadosStatus.textContent = 'Não foi possível carregar a base de substâncias — recarregue a página.';
@@ -1130,8 +1122,6 @@
   function coletarCamposExtras() {
     const extras = {};
     const mapa = {
-      cor: 'ex-cor',
-      odor: 'ex-odor',
       ph: 'ex-ph',
       numero_onu: 'ex-numero-onu',
       classe_risco: 'ex-classe-risco',
@@ -1143,15 +1133,6 @@
       if (valor) extras[chave] = valor;
     }
     return extras;
-  }
-
-  function coletarProdutoInfo() {
-    const info = {};
-    const codigoProduto = document.getElementById('ex-codigo-produto').value.trim();
-    const restricoesUso = document.getElementById('ex-restricoes-uso').value.trim();
-    if (codigoProduto) info.codigo_produto = codigoProduto;
-    if (restricoesUso) info.restricoes_uso = restricoesUso;
-    return info;
   }
 
   const NOMES_VIA = {
@@ -1349,10 +1330,10 @@
         await calcularClassificacaoMistura(formula, estadoFisicoValidado);
 
       const perfilEmpresa = coletarDadosEmpresa();
-      const produtoInfo = Object.assign(
-        { nome_produto: nomeProduto, uso_recomendado: document.getElementById('prod-use').value.trim() },
-        coletarProdutoInfo()
-      );
+      const produtoInfo = {
+        nome_produto: nomeProduto,
+        uso_recomendado: document.getElementById('prod-use').value.trim(),
+      };
       const camposExtras = coletarCamposExtras();
       const numeroRevisao = document.getElementById('ex-numero-revisao').value.trim() || '01';
 
