@@ -125,6 +125,10 @@ Bibliotecas externas, carregadas por CDN em versões fixas: `jspdf@2.5.2`,
 importador de planilha `.xlsx`, que continua no código mas não aparece na tela).
 O login e a geração do PDF exigem internet.
 
+Mudanças enviadas a este repositório aparecem no site depois do build do
+GitHub Pages (aba **Actions**, "pages build and deployment", ~1 min) e do
+cache do CDN (até 10 min).
+
 ### Rodar localmente
 
 A página usa módulos ES, que o navegador bloqueia quando o arquivo é aberto
