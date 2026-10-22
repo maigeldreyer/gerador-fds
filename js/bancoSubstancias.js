@@ -4,13 +4,29 @@
  *
  * Porte 1:1 de banco_substancias.py / BancoSubstancias.php para rodar 100%
  * no navegador: SQLite -> IndexedDB, pandas -> SheetJS (biblioteca `xlsx`,
- * carregada via CDN na página), leitura de arquivo -> File API (o usuário
- * seleciona o .xlsx do Anexo VI direto no navegador; o arquivo NUNCA é
- * enviado a lugar nenhum, fica só na memória/IndexedDB local).
+ * usada só pelo importador manual de arquivo, importarAnexoVi).
  *
- * Mesma observação de direitos autorais do projeto original: o .xlsx do
- * Anexo VI e o conteúdo da NBR não são distribuídos com este código — cada
- * usuário importa sua própria cópia, uma vez, localmente.
+ * A importação principal (importarAnexoViDeDataset) usa um dataset já
+ * extraído do Anexo VI, embutido no repositório em
+ * js/anexo_vi_compacto.json, carregado automaticamente ao abrir a página —
+ * sem exigir nenhuma ação do usuário. Nada disso é enviado a lugar nenhum:
+ * o dataset vem do próprio repositório estático e os dados processados
+ * ficam só no IndexedDB local do navegador.
+ *
+ * NOTA SOBRE A FONTE DO DADO: js/anexo_vi_compacto.json é derivado da
+ * tabela "unofficial" que a ECHA disponibiliza para conveniência (Table 3
+ * do Anexo VI ao Regulamento CLP). A página da ECHA inclui o aviso: "This
+ * document should be treated only for informative purposes and should not
+ * be used for commercial activities or reproduced further." Embutir esse
+ * dado no repositório foi uma decisão explícita do responsável pelo
+ * projeto, ciente desse aviso — ver fonte_versao no próprio JSON para a
+ * versão/ATP usada. O texto legal em si (Regulamento CLP e seus anexos) é
+ * de reuso livre (Decisão 2011/833/UE), mas essa tabela de conveniência da
+ * ECHA especificamente não é.
+ *
+ * importarAnexoVi (import manual via arquivo .xlsx escolhido pelo usuário)
+ * continua disponível no código para quem quiser reimportar uma versão
+ * mais nova por conta própria, mesmo sem UI dedicada na tela principal.
  */
 
 import { ViaExposicao, criarIngrediente } from "./motorToxicidadeAguda.js";
@@ -513,6 +529,116 @@ export class BancoSubstancias {
 
       const textoClasse = _celulaParaTexto(linha[colClasse]) || "";
       const textoH = _celulaParaTexto(linha[colH]) || "";
+
+      const { resultados: pares, avisos: avisosLinha } = _parseToxicidadeAguda(textoClasse, textoH);
+      if (avisosLinha.length) resumo.avisos_parser.push(...avisosLinha.map((a) => `CAS ${cas}: ${a}`));
+      if (!pares.length) resumo.linhas_sem_toxicidade_aguda += 1;
+      for (const [viaStr, categoria] of pares) {
+        this._inserirToxicidadeAgudaVariante(
+          storeToxAguda, cas, viaStr, categoria, faixaMin, faixaMinIncl, faixaMax, faixaMaxIncl,
+          nome, `ECHA_ANEXO_VI (${versao})`
+        );
+        const chave = `${cas}|${viaStr}`;
+        casContagemPorVia.set(chave, (casContagemPorVia.get(chave) || 0) + 1);
+      }
+
+      const { categoriaPele: catPele, categoriaOlhos: catOlhos, avisos: avisosPeleOlhos } =
+        _parsePeleOlhos(textoClasse, textoH);
+      if (avisosPeleOlhos.length) resumo.avisos_parser.push(...avisosPeleOlhos.map((a) => `CAS ${cas}: ${a}`));
+      if (catPele !== null || catOlhos !== null) {
+        resumo.linhas_com_pele_ou_olhos += 1;
+        this._inserirPeleOlhosVariante(
+          storePeleOlhos, cas, catPele, catOlhos, faixaMin, faixaMinIncl, faixaMax, faixaMaxIncl,
+          nome, `ECHA_ANEXO_VI (${versao})`
+        );
+      }
+    }
+
+    await _txDone(tx);
+
+    resumo.cas_com_multiplas_linhas = [...casContagemPorVia.values()].filter((n) => n > 1).length;
+
+    return resumo;
+  }
+
+  // -----------------------------------------------------------------
+  // Importador do Anexo VI a partir do dataset já extraído e embutido no
+  // repositório (js/anexo_vi_compacto.json) — mesma lógica de parsing do
+  // importarAnexoVi acima, mas sem precisar da biblioteca SheetJS nem de
+  // um arquivo .xlsx escolhido pelo usuário. Usado na importação automática
+  // ao carregar a página.
+  // -----------------------------------------------------------------
+
+  /**
+   * @param {{campos: string[], linhas: Array[], fonte_versao?: string}} dataset
+   * @param {Object} [opcoes]
+   * @param {string} [opcoes.fonteVersao]
+   */
+  async importarAnexoViDeDataset(dataset, { fonteVersao = null } = {}) {
+    const campos = dataset.campos;
+    const idx = {};
+    for (const campo of ["cas", "nome", "ec", "classificacao", "h_codes"]) {
+      idx[campo] = campos.indexOf(campo);
+    }
+    const faltante = Object.entries(idx).find(([, i]) => i === -1);
+    if (faltante) {
+      throw new Error(
+        `Dataset embutido do Anexo VI não tem o campo esperado '${faltante[0]}'. ` +
+          `Campos encontrados: ${campos.join(", ")}`
+      );
+    }
+
+    const versao = fonteVersao || dataset.fonte_versao || `importado em ${_hoje()}`;
+
+    // Idempotência: mesmo comportamento do importarAnexoVi — apaga TODAS as
+    // linhas de origem ECHA_ANEXO_VI antes de reimportar. Cadastros MANUAIS
+    // (outra fonte) não são afetados.
+    {
+      const tx = this._tx(["toxicidade_aguda", "pele_olhos"], "readwrite");
+      for (const nomeLoja of ["toxicidade_aguda", "pele_olhos"]) {
+        const store = tx.objectStore(nomeLoja);
+        const todos = await _reqToPromise(store.getAll());
+        for (const row of todos) {
+          if (typeof row.fonte === "string" && row.fonte.startsWith("ECHA_ANEXO_VI")) {
+            store.delete(row.id);
+          }
+        }
+      }
+      await _txDone(tx);
+    }
+
+    const resumo = {
+      linhas_lidas: dataset.linhas.length, substancias_gravadas: 0,
+      linhas_sem_cas: 0, linhas_sem_toxicidade_aguda: 0,
+      linhas_com_pele_ou_olhos: 0, cas_com_multiplas_linhas: 0,
+      avisos_parser: [],
+    };
+
+    const tx = this._tx(["substancias", "toxicidade_aguda", "pele_olhos"], "readwrite");
+    const storeSubstancias = tx.objectStore("substancias");
+    const storeToxAguda = tx.objectStore("toxicidade_aguda");
+    const storePeleOlhos = tx.objectStore("pele_olhos");
+
+    const casContagemPorVia = new Map();
+
+    for (const linha of dataset.linhas) {
+      const cas = _celulaParaTexto(linha[idx.cas]);
+      if (!cas) {
+        resumo.linhas_sem_cas += 1;
+        continue;
+      }
+      const nome = _celulaParaTexto(linha[idx.nome]) || cas;
+      const ec = _celulaParaTexto(linha[idx.ec]);
+
+      storeSubstancias.put({
+        cas, ec_number: ec, nome, fonte: "ECHA_ANEXO_VI", fonte_versao: versao, data_importacao: _hoje(),
+      });
+      resumo.substancias_gravadas += 1;
+
+      const [faixaMin, faixaMinIncl, faixaMax, faixaMaxIncl] = extrairFaixaConcentracao(nome);
+
+      const textoClasse = _celulaParaTexto(linha[idx.classificacao]) || "";
+      const textoH = _celulaParaTexto(linha[idx.h_codes]) || "";
 
       const { resultados: pares, avisos: avisosLinha } = _parseToxicidadeAguda(textoClasse, textoH);
       if (avisosLinha.length) resumo.avisos_parser.push(...avisosLinha.map((a) => `CAS ${cas}: ${a}`));
