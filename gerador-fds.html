@@ -695,23 +695,10 @@
       <span class="section-num">📚</span>
       <h2 class="section-title">Base de dados de substâncias (Anexo VI)</h2>
     </div>
-    <p class="section-hint">A classificação de cada substância vem do Anexo VI do Regulamento CLP (ECHA). Importe o arquivo .xlsx uma vez — ele fica salvo só neste navegador (IndexedDB) e nunca é enviado a lugar nenhum. É preciso importar antes de calcular qualquer coisa.</p>
+    <p class="section-hint">A classificação de cada substância vem do Anexo VI do Regulamento CLP (ECHA), já embutida nesta página — carrega automaticamente, sem nenhuma ação necessária.</p>
     <div class="field-grid">
       <div class="field full">
         <p class="field-note" id="base-dados-status" style="font-size: 13.5px;">Verificando base local…</p>
-      </div>
-      <div class="field">
-        <label for="anexo-vi-arquivo">Arquivo do Anexo VI (.xlsx)</label>
-        <input type="file" id="anexo-vi-arquivo" accept=".xlsx">
-      </div>
-      <div class="field">
-        <label for="anexo-vi-header-row">Linha do cabeçalho (0 = primeira linha)</label>
-        <input type="number" id="anexo-vi-header-row" value="2" min="0" step="1">
-        <p class="field-note">A planilha "unofficial" da ECHA costuma ter um aviso antes do cabeçalho real — ajuste se a importação não encontrar as colunas esperadas.</p>
-      </div>
-      <div class="field full" style="flex-direction: row; gap: 10px;">
-        <button type="button" class="add-row" id="btn-importar-anexo-vi">Importar Anexo VI</button>
-        <button type="button" class="add-row" id="btn-limpar-base">Limpar base local</button>
       </div>
     </div>
   </div>
@@ -948,60 +935,49 @@
   }
 
   // --- Base de dados de substâncias (Anexo VI), em IndexedDB local ---
+  //
+  // O dataset já vem embutido no repositório (js/anexo_vi_compacto.json) e
+  // é importado automaticamente aqui, sem nenhuma ação do usuário. A versão
+  // importada fica marcada no localStorage (não é dado sensível, só controla
+  // reimportação) — se o arquivo embutido for atualizado no futuro (nova
+  // ATP), basta mudar fonte_versao no JSON que a reimportação acontece
+  // sozinha no próximo carregamento, para todo mundo.
 
   const banco = new BancoSubstancias();
-
-  const campoAnexoViArquivo = document.getElementById('anexo-vi-arquivo');
-  const campoAnexoViHeaderRow = document.getElementById('anexo-vi-header-row');
   const baseDadosStatus = document.getElementById('base-dados-status');
-  const btnImportarAnexoVi = document.getElementById('btn-importar-anexo-vi');
-  const btnLimparBase = document.getElementById('btn-limpar-base');
+  const CHAVE_VERSAO_ANEXO_VI = 'gerador_fds_anexo_vi_versao';
+  const URL_ANEXO_VI_DATASET = './js/anexo_vi_compacto.json';
 
   async function atualizarStatusBase() {
     const total = await banco.contarSubstancias();
     baseDadosStatus.textContent = total > 0
-      ? `${total} substância(s) cadastrada(s) localmente, neste navegador.`
-      : 'Nenhuma substância cadastrada ainda — importe o Anexo VI abaixo antes de calcular.';
+      ? `${total} substância(s) carregada(s) automaticamente (Anexo VI, ECHA).`
+      : 'Carregando base de substâncias (Anexo VI)…';
   }
 
-  btnImportarAnexoVi.addEventListener('click', async () => {
-    const arquivo = campoAnexoViArquivo.files[0];
-    if (!arquivo) {
-      alert('Selecione o arquivo .xlsx do Anexo VI primeiro.');
+  async function garantirBaseAnexoViCarregada() {
+    const total = await banco.contarSubstancias();
+    let versaoImportada = null;
+    try { versaoImportada = localStorage.getItem(CHAVE_VERSAO_ANEXO_VI); } catch { /* ignorado */ }
+
+    if (total > 0 && versaoImportada) {
+      await atualizarStatusBase();
       return;
     }
-    const headerRow = parseInt(campoAnexoViHeaderRow.value, 10) || 0;
 
-    btnImportarAnexoVi.disabled = true;
-    btnImportarAnexoVi.textContent = 'Importando…';
-    connectionError.classList.remove('visible');
+    baseDadosStatus.textContent = 'Carregando base de substâncias (Anexo VI)…';
     try {
-      const resumo = await banco.importarAnexoVi(arquivo, { headerRow });
+      const resp = await fetch(URL_ANEXO_VI_DATASET);
+      if (!resp.ok) throw new Error(`resposta ${resp.status} ao buscar o dataset embutido`);
+      const dataset = await resp.json();
+      await banco.importarAnexoViDeDataset(dataset);
+      try { localStorage.setItem(CHAVE_VERSAO_ANEXO_VI, dataset.fonte_versao || 'embutido'); } catch { /* ignorado */ }
       await atualizarStatusBase();
-      let msg = `Importação concluída: ${resumo.substancias_gravadas} substância(s) gravada(s) ` +
-        `(${resumo.linhas_sem_cas} linha(s) sem CAS ignorada(s), ` +
-        `${resumo.linhas_sem_toxicidade_aguda} sem toxicidade aguda reconhecida, ` +
-        `${resumo.cas_com_multiplas_linhas} CAS com múltiplas linhas no Anexo VI).`;
-      if (resumo.avisos_parser.length) {
-        const amostra = resumo.avisos_parser.slice(0, 20).join('\n');
-        msg += `\n\n${resumo.avisos_parser.length} aviso(s) do importador — revise antes de confiar na classificação:\n${amostra}`;
-        if (resumo.avisos_parser.length > 20) msg += `\n… e mais ${resumo.avisos_parser.length - 20}.`;
-      }
-      alert(msg);
     } catch (erro) {
-      mostrarErro('Não foi possível importar o Anexo VI: ' + erro.message);
-    } finally {
-      btnImportarAnexoVi.disabled = false;
-      btnImportarAnexoVi.textContent = 'Importar Anexo VI';
+      baseDadosStatus.textContent = 'Não foi possível carregar a base de substâncias — recarregue a página.';
+      mostrarErro('Falha ao carregar a base de substâncias (Anexo VI): ' + erro.message);
     }
-  });
-
-  btnLimparBase.addEventListener('click', async () => {
-    if (!confirm('Apagar toda a base de substâncias importada deste navegador? Você precisará reimportar o Anexo VI depois.')) return;
-    banco.fechar();
-    await BancoSubstancias.apagar();
-    location.reload();
-  });
+  }
 
   // --- Autenticação e dados do fornecedor (Seção 1), vindos do login ---
 
@@ -1418,7 +1394,7 @@
 
     try {
       await banco.abrir();
-      await atualizarStatusBase();
+      await garantirBaseAnexoViCarregada();
     } catch (erro) {
       mostrarErro('Não foi possível abrir a base de dados local (IndexedDB): ' + erro.message);
     }
