@@ -544,6 +544,32 @@
 
   <div class="section">
     <div class="section-head">
+      <span class="section-num">📚</span>
+      <h2 class="section-title">Base de dados de substâncias (Anexo VI)</h2>
+    </div>
+    <p class="section-hint">A classificação de cada substância vem do Anexo VI do Regulamento CLP (ECHA). Importe o arquivo .xlsx uma vez — ele fica salvo só neste navegador (IndexedDB) e nunca é enviado a lugar nenhum. É preciso importar antes de calcular qualquer coisa.</p>
+    <div class="field-grid">
+      <div class="field full">
+        <p class="field-note" id="base-dados-status" style="font-size: 13.5px;">Verificando base local…</p>
+      </div>
+      <div class="field">
+        <label for="anexo-vi-arquivo">Arquivo do Anexo VI (.xlsx)</label>
+        <input type="file" id="anexo-vi-arquivo" accept=".xlsx">
+      </div>
+      <div class="field">
+        <label for="anexo-vi-header-row">Linha do cabeçalho (0 = primeira linha)</label>
+        <input type="number" id="anexo-vi-header-row" value="2" min="0" step="1">
+        <p class="field-note">A planilha "unofficial" da ECHA costuma ter um aviso antes do cabeçalho real — ajuste se a importação não encontrar as colunas esperadas.</p>
+      </div>
+      <div class="field full" style="flex-direction: row; gap: 10px;">
+        <button type="button" class="add-row" id="btn-importar-anexo-vi">Importar Anexo VI</button>
+        <button type="button" class="add-row" id="btn-limpar-base">Limpar base local</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
       <span class="section-num">🏢</span>
       <h2 class="section-title">Dados do fornecedor</h2>
     </div>
@@ -704,11 +730,7 @@
       <button type="button" class="generate" id="btn-gerar-pdf">Gerar FDS em PDF</button>
     </div>
     <p class="submit-method">A classificação é obtida por cálculo determinístico a partir dos dados de perigo de cada substância — sem uso de IA na decisão de classificação.</p>
-    <div class="connection-error" id="connection-error">
-      Não foi possível conectar ao motor de cálculo local em <code>http://localhost:5000</code>.
-      Verifique se o servidor está rodando na sua máquina (<code>python3 api_local.py</code>)
-      e tente novamente.
-    </div>
+    <div class="connection-error" id="connection-error"></div>
   </div>
 
   <div class="results" id="results">
@@ -759,19 +781,90 @@
 
   // seed with 4 empty rows
   for (let i = 0; i < 4; i++) makeRow();
+</script>
 
-  // --- Integração com a API local (api_local.py, http://localhost:5000) ---
+<!-- Bibliotecas de terceiros, carregadas via CDN — tudo roda no navegador,
+     sem nenhum servidor. Versões fixas por reprodutibilidade. -->
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  const BASE_URL = 'http://localhost:5000';
-  const API_URL = BASE_URL + '/api/classificar';
-  const API_GERAR_FDS_URL = BASE_URL + '/api/gerar_fds';
-  const API_PERFIS_URL = BASE_URL + '/api/perfis';
+<script type="module">
+  import { BancoSubstancias } from './js/bancoSubstancias.js';
+  import { ViaExposicao, classificarTodasAsVias } from './js/motorToxicidadeAguda.js';
+  import { classificarCorrosaoIrritacaoPele, classificarLesaoOcular } from './js/motorCorrosaoIrritacao.js';
+  import { montarDadosFds, gerarPdfFds } from './js/geradorFds.js';
+  import { RepositorioPerfisEmpresa } from './js/perfisEmpresa.js';
+
+  const body = document.getElementById('comp-body');
 
   const btnCalcular = document.getElementById('btn-calcular');
   const btnGerarPdf = document.getElementById('btn-gerar-pdf');
   const connectionError = document.getElementById('connection-error');
   const resultsPanel = document.getElementById('results');
   const resultsBody = document.getElementById('results-body');
+
+  function mostrarErro(mensagem) {
+    connectionError.textContent = mensagem;
+    connectionError.classList.add('visible');
+  }
+
+  // --- Base de dados de substâncias (Anexo VI), em IndexedDB local ---
+
+  const banco = new BancoSubstancias();
+  const repoPerfis = new RepositorioPerfisEmpresa();
+
+  const campoAnexoViArquivo = document.getElementById('anexo-vi-arquivo');
+  const campoAnexoViHeaderRow = document.getElementById('anexo-vi-header-row');
+  const baseDadosStatus = document.getElementById('base-dados-status');
+  const btnImportarAnexoVi = document.getElementById('btn-importar-anexo-vi');
+  const btnLimparBase = document.getElementById('btn-limpar-base');
+
+  async function atualizarStatusBase() {
+    const total = await banco.contarSubstancias();
+    baseDadosStatus.textContent = total > 0
+      ? `${total} substância(s) cadastrada(s) localmente, neste navegador.`
+      : 'Nenhuma substância cadastrada ainda — importe o Anexo VI abaixo antes de calcular.';
+  }
+
+  btnImportarAnexoVi.addEventListener('click', async () => {
+    const arquivo = campoAnexoViArquivo.files[0];
+    if (!arquivo) {
+      alert('Selecione o arquivo .xlsx do Anexo VI primeiro.');
+      return;
+    }
+    const headerRow = parseInt(campoAnexoViHeaderRow.value, 10) || 0;
+
+    btnImportarAnexoVi.disabled = true;
+    btnImportarAnexoVi.textContent = 'Importando…';
+    connectionError.classList.remove('visible');
+    try {
+      const resumo = await banco.importarAnexoVi(arquivo, { headerRow });
+      await atualizarStatusBase();
+      let msg = `Importação concluída: ${resumo.substancias_gravadas} substância(s) gravada(s) ` +
+        `(${resumo.linhas_sem_cas} linha(s) sem CAS ignorada(s), ` +
+        `${resumo.linhas_sem_toxicidade_aguda} sem toxicidade aguda reconhecida, ` +
+        `${resumo.cas_com_multiplas_linhas} CAS com múltiplas linhas no Anexo VI).`;
+      if (resumo.avisos_parser.length) {
+        const amostra = resumo.avisos_parser.slice(0, 20).join('\n');
+        msg += `\n\n${resumo.avisos_parser.length} aviso(s) do importador — revise antes de confiar na classificação:\n${amostra}`;
+        if (resumo.avisos_parser.length > 20) msg += `\n… e mais ${resumo.avisos_parser.length - 20}.`;
+      }
+      alert(msg);
+    } catch (erro) {
+      mostrarErro('Não foi possível importar o Anexo VI: ' + erro.message);
+    } finally {
+      btnImportarAnexoVi.disabled = false;
+      btnImportarAnexoVi.textContent = 'Importar Anexo VI';
+    }
+  });
+
+  btnLimparBase.addEventListener('click', async () => {
+    if (!confirm('Apagar toda a base de substâncias importada deste navegador? Você precisará reimportar o Anexo VI depois.')) return;
+    banco.fechar();
+    await BancoSubstancias.apagar();
+    location.reload();
+  });
 
   // --- Perfis de empresa (Seção 1 — dados do fornecedor, reaproveitáveis) ---
 
@@ -813,18 +906,12 @@
     };
   }
 
-  async function carregarPerfis(selecionarId) {
-    try {
-      const resposta = await fetch(API_PERFIS_URL);
-      if (!resposta.ok) return;
-      perfisCarregados = await resposta.json();
-      perfilSelect.innerHTML = '<option value="">— Novo perfil —</option>' +
-        perfisCarregados.map(p => `<option value="${p.id}">${p.razao_social}</option>`).join('');
-      if (selecionarId) {
-        perfilSelect.value = selecionarId;
-      }
-    } catch (erro) {
-      // Sem servidor local ainda — a tela continua utilizável, só sem perfis salvos.
+  function carregarPerfis(selecionarId) {
+    perfisCarregados = repoPerfis.listar();
+    perfilSelect.innerHTML = '<option value="">— Novo perfil —</option>' +
+      perfisCarregados.map(p => `<option value="${p.id}">${p.razao_social}</option>`).join('');
+    if (selecionarId) {
+      perfilSelect.value = selecionarId;
     }
   }
 
@@ -837,7 +924,7 @@
     }
   });
 
-  document.getElementById('btn-salvar-perfil').addEventListener('click', async () => {
+  document.getElementById('btn-salvar-perfil').addEventListener('click', () => {
     const dadosEmpresa = coletarDadosEmpresa();
     if (!dadosEmpresa.razao_social) {
       alert('Informe a razão social antes de salvar o perfil.');
@@ -845,36 +932,21 @@
     }
     const perfilIdAtual = perfilSelect.value || null;
     try {
-      const resposta = await fetch(perfilIdAtual ? `${API_PERFIS_URL}/${perfilIdAtual}` : API_PERFIS_URL, {
-        method: perfilIdAtual ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(dadosEmpresa),
-      });
-      const perfilSalvo = await resposta.json();
-      if (!resposta.ok) {
-        alert('Não foi possível salvar o perfil: ' + ((perfilSalvo.detalhes || [perfilSalvo.erro]).join(' ')));
-        return;
-      }
-      await carregarPerfis(perfilSalvo.id);
+      const perfilSalvo = repoPerfis.salvar(dadosEmpresa, perfilIdAtual);
+      carregarPerfis(perfilSalvo.id);
     } catch (erro) {
-      connectionError.classList.add('visible');
+      alert('Não foi possível salvar o perfil: ' + erro.message);
     }
   });
 
-  document.getElementById('btn-excluir-perfil').addEventListener('click', async () => {
+  document.getElementById('btn-excluir-perfil').addEventListener('click', () => {
     const perfilIdAtual = perfilSelect.value;
     if (!perfilIdAtual) return;
     if (!confirm('Excluir este perfil de empresa salvo? Esta ação não afeta nenhuma FDS já gerada.')) return;
-    try {
-      await fetch(`${API_PERFIS_URL}/${perfilIdAtual}`, { method: 'DELETE' });
-      limparCamposEmpresa();
-      await carregarPerfis();
-    } catch (erro) {
-      connectionError.classList.add('visible');
-    }
+    repoPerfis.excluir(perfilIdAtual);
+    limparCamposEmpresa();
+    carregarPerfis();
   });
-
-  carregarPerfis();
 
   // --- Campos adicionais (Seção 3 da tela — "poucos campos" opcionais) ---
 
@@ -922,6 +994,76 @@
         segredo_industrial: tr.querySelector('td.secrecy input').checked,
       };
     }).filter(item => item.nome || item.cas || item.concentracao);
+  }
+
+  // --- Validação de entrada (mesma lógica da antiga API local) ---
+
+  function validarEntrada({ nomeProduto, estadoFisico, composicao }) {
+    nomeProduto = (nomeProduto || '').trim();
+    const errosValidacao = [];
+    if (!nomeProduto) errosValidacao.push('Nome do produto é obrigatório.');
+    if (!['liquido', 'solido_pulverulento'].includes(estadoFisico)) {
+      errosValidacao.push('estado_fisico deve ser "liquido" ou "solido_pulverulento".');
+    }
+    if (!composicao || !composicao.length) errosValidacao.push('A composição da mistura não pode estar vazia.');
+
+    const formula = [];
+    let somaConcentracoes = 0;
+    (composicao || []).forEach((item, i) => {
+      const nome = (item.nome || '').trim();
+      const cas = (item.cas || '').trim();
+      const concentracao = parseFloat(item.concentracao);
+      if (Number.isNaN(concentracao)) {
+        errosValidacao.push(`Linha ${i + 1}: concentração inválida.`);
+        return;
+      }
+      if (!nome) {
+        errosValidacao.push(`Linha ${i + 1}: nome da substância é obrigatório.`);
+        return;
+      }
+      if (!cas) {
+        errosValidacao.push(
+          `Linha ${i + 1} ('${nome}'): Nº CAS é obrigatório — o motor busca a classificação de ` +
+          `perigo pelo CAS, sem ele a substância não pode ser avaliada.`
+        );
+        return;
+      }
+      formula.push({ nome, cas, concentracao, segredo_industrial: !!item.segredo_industrial });
+      somaConcentracoes += concentracao;
+    });
+
+    if (!errosValidacao.length && Math.abs(somaConcentracoes - 100) > 0.5) {
+      errosValidacao.push(
+        `A soma das concentrações é ${somaConcentracoes.toFixed(2)}%, não 100%. ` +
+        `Corrija a fórmula antes de calcular a classificação.`
+      );
+    }
+
+    return { nomeProduto, estadoFisico, formula, somaConcentracoes, errosValidacao };
+  }
+
+  function mostrarErrosValidacao(titulo, erros) {
+    resultsBody.innerHTML = `<div class="avisos-box"><p class="avisos-box-title">${titulo}</p>` +
+      `<ul>${erros.map(e => `<li>${e}</li>`).join('')}</ul></div>`;
+    resultsPanel.classList.add('visible');
+  }
+
+  // --- Cálculo da classificação (mesma orquestração da antiga /api/classificar) ---
+
+  async function calcularClassificacaoMistura(formula, estadoFisico) {
+    const { ingredientesPorVia, avisos: avisosTox } = await banco.montarIngredientesPorVia(formula, estadoFisico);
+    const resultadoToxicidadeAguda = classificarTodasAsVias(ingredientesPorVia);
+
+    const { ingredientes: ingredientesPeleOlhos, avisos: avisosPeleOlhos } = await banco.montarIngredientesPeleOlhos(formula);
+    const resultadoPele = classificarCorrosaoIrritacaoPele(ingredientesPeleOlhos);
+    const resultadoOlhos = classificarLesaoOcular(ingredientesPeleOlhos);
+
+    return {
+      resultadoToxicidadeAguda,
+      resultadoPele,
+      resultadoOlhos,
+      avisos: [...avisosTox, ...avisosPeleOlhos],
+    };
   }
 
   function renderizarCartaoPerigo(titulo, resultado) {
@@ -973,37 +1115,30 @@
     resultsPanel.classList.remove('visible');
 
     const nomeProduto = document.getElementById('prod-name').value.trim();
-    const usoRecomendado = document.getElementById('prod-use').value.trim();
     const estadoFisico = document.querySelector('input[name="estado-fisico"]:checked').value;
     const composicao = coletarComposicao();
+
+    const { formula, estadoFisico: estadoFisicoValidado, errosValidacao } =
+      validarEntrada({ nomeProduto, estadoFisico, composicao });
+    if (errosValidacao.length) {
+      mostrarErrosValidacao('Não foi possível calcular', errosValidacao);
+      return;
+    }
 
     btnCalcular.disabled = true;
     btnCalcular.textContent = 'Calculando…';
 
     try {
-      const resposta = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nome_produto: nomeProduto,
-          uso_recomendado: usoRecomendado,
-          estado_fisico: estadoFisico,
-          composicao: composicao,
-        }),
+      const { resultadoToxicidadeAguda, resultadoPele, resultadoOlhos, avisos } =
+        await calcularClassificacaoMistura(formula, estadoFisicoValidado);
+      renderizarResultados({
+        toxicidade_aguda: resultadoToxicidadeAguda,
+        corrosao_irritacao_pele: resultadoPele,
+        lesao_ocular: resultadoOlhos,
+        avisos,
       });
-
-      const dados = await resposta.json();
-
-      if (!resposta.ok) {
-        const detalhes = (dados.detalhes || [dados.erro || 'Erro desconhecido.']).join(' ');
-        resultsBody.innerHTML = `<div class="avisos-box"><p class="avisos-box-title">Não foi possível calcular</p><ul><li>${detalhes}</li></ul></div>`;
-        resultsPanel.classList.add('visible');
-        return;
-      }
-
-      renderizarResultados(dados);
     } catch (erro) {
-      connectionError.classList.add('visible');
+      mostrarErro('Erro ao calcular a classificação: ' + erro.message);
     } finally {
       btnCalcular.disabled = false;
       btnCalcular.textContent = 'Calcular classificação';
@@ -1012,59 +1147,54 @@
 
   btnCalcular.addEventListener('click', calcularClassificacao);
 
-  // --- Geração da FDS completa em PDF (/api/gerar_fds) ---
-
-  function montarPayloadFds() {
-    return {
-      nome_produto: document.getElementById('prod-name').value.trim(),
-      estado_fisico: document.querySelector('input[name="estado-fisico"]:checked').value,
-      composicao: coletarComposicao(),
-      perfil_empresa: coletarDadosEmpresa(),
-      produto_info: Object.assign(
-        { uso_recomendado: document.getElementById('prod-use').value.trim() },
-        coletarProdutoInfo()
-      ),
-      campos_extras: coletarCamposExtras(),
-      numero_revisao: document.getElementById('ex-numero-revisao').value.trim() || '01',
-    };
-  }
+  // --- Geração da FDS completa em PDF (antiga /api/gerar_fds) ---
 
   async function gerarFdsPdf() {
     connectionError.classList.remove('visible');
     resultsPanel.classList.remove('visible');
 
+    const nomeProduto = document.getElementById('prod-name').value.trim();
+    const estadoFisico = document.querySelector('input[name="estado-fisico"]:checked').value;
+    const composicao = coletarComposicao();
+
+    const { formula, estadoFisico: estadoFisicoValidado, errosValidacao } =
+      validarEntrada({ nomeProduto, estadoFisico, composicao });
+    if (errosValidacao.length) {
+      mostrarErrosValidacao('Não foi possível gerar a FDS em PDF', errosValidacao);
+      return;
+    }
+
     btnGerarPdf.disabled = true;
     btnGerarPdf.textContent = 'Gerando PDF…';
 
     try {
-      const resposta = await fetch(API_GERAR_FDS_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(montarPayloadFds()),
+      const { resultadoToxicidadeAguda, resultadoPele, resultadoOlhos } =
+        await calcularClassificacaoMistura(formula, estadoFisicoValidado);
+
+      const perfilEmpresa = coletarDadosEmpresa();
+      const produtoInfo = Object.assign(
+        { nome_produto: nomeProduto, uso_recomendado: document.getElementById('prod-use').value.trim() },
+        coletarProdutoInfo()
+      );
+      const camposExtras = coletarCamposExtras();
+      const numeroRevisao = document.getElementById('ex-numero-revisao').value.trim() || '01';
+
+      const dadosFds = await montarDadosFds({
+        perfilEmpresa,
+        produtoInfo,
+        composicao: formula,
+        estadoFisico: estadoFisicoValidado,
+        resultadoToxicidadeAguda,
+        resultadoPele,
+        resultadoOlhos,
+        banco,
+        camposExtras,
+        numeroRevisao,
       });
 
-      const tipoConteudo = resposta.headers.get('Content-Type') || '';
-
-      if (!resposta.ok || tipoConteudo.includes('application/json')) {
-        const dados = await resposta.json();
-        const detalhes = (dados.detalhes || [dados.erro || 'Erro desconhecido.']).join(' ');
-        resultsBody.innerHTML = `<div class="avisos-box"><p class="avisos-box-title">Não foi possível gerar a FDS em PDF</p><ul><li>${detalhes}</li></ul></div>`;
-        resultsPanel.classList.add('visible');
-        return;
-      }
-
-      const blob = await resposta.blob();
-      const nomeArquivo = (document.getElementById('prod-name').value.trim() || 'FDS').replace(/[^\w-]+/g, '_') + '.pdf';
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'FDS_' + nomeArquivo;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
+      gerarPdfFds(dadosFds, { autoSalvar: true });
     } catch (erro) {
-      connectionError.classList.add('visible');
+      mostrarErro('Erro ao gerar a FDS em PDF: ' + erro.message);
     } finally {
       btnGerarPdf.disabled = false;
       btnGerarPdf.textContent = 'Gerar FDS em PDF';
@@ -1072,6 +1202,18 @@
   }
 
   btnGerarPdf.addEventListener('click', gerarFdsPdf);
+
+  // --- Inicialização ---
+
+  (async function iniciar() {
+    try {
+      await banco.abrir();
+      await atualizarStatusBase();
+    } catch (erro) {
+      mostrarErro('Não foi possível abrir a base de dados local (IndexedDB): ' + erro.message);
+    }
+    carregarPerfis();
+  })();
 </script>
 
 </body>
