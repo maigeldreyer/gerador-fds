@@ -185,7 +185,7 @@
     margin-left: 2px;
   }
 
-  input[type="text"], input[type="number"] {
+  input[type="text"], input[type="number"], input[type="password"] {
     font-family: 'IBM Plex Sans', sans-serif;
     font-size: 14.5px;
     color: var(--ink);
@@ -525,11 +525,150 @@
     .comp thead th:nth-child(2) { display: none; }
     .comp tbody td:nth-child(2) { display: none; }
   }
+
+  /* --- Login / sessão --- */
+
+  #app { display: none; }
+  #app.visible { display: block; }
+
+  .login-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: var(--paper);
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 100;
+  }
+
+  .login-overlay.visible { display: flex; }
+
+  .login-card {
+    width: 100%;
+    max-width: 360px;
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 32px 28px;
+  }
+
+  .login-title {
+    font-family: 'Source Serif 4', serif;
+    font-weight: 600;
+    font-size: 22px;
+    margin: 0 0 6px;
+  }
+
+  .login-sub {
+    margin: 0 0 22px;
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+  }
+
+  .login-form { display: flex; flex-direction: column; gap: 16px; }
+
+  .login-remember {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    cursor: pointer;
+  }
+
+  .login-remember input { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
+
+  .login-erro {
+    margin: 0;
+    font-size: 13px;
+    color: var(--danger);
+    min-height: 1em;
+  }
+
+  .login-submit { width: 100%; padding: 12px; text-align: center; }
+
+  .auth-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    margin-bottom: 18px;
+  }
+
+  .auth-bar-actions { display: flex; gap: 14px; }
+
+  .link-button {
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .link-button:hover { color: var(--accent); }
+
+  .readonly-value {
+    font-size: 14.5px;
+    color: var(--ink);
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 10px 12px;
+    margin: 0;
+    min-height: 20px;
+    line-height: 1.4;
+  }
 </style>
 </head>
 <body>
 
-<div class="sheet">
+<div class="login-overlay" id="login-overlay">
+  <div class="login-card">
+    <p class="login-title">Gerador de FDS</p>
+    <p class="login-sub" id="login-sub">Entre com seu usuário para continuar.</p>
+
+    <form id="login-form" class="login-form">
+      <div class="field">
+        <label for="login-usuario">Usuário</label>
+        <input type="text" id="login-usuario" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label for="login-senha">Senha</label>
+        <input type="password" id="login-senha" autocomplete="current-password" required>
+      </div>
+      <label class="login-remember">
+        <input type="checkbox" id="login-lembrar">
+        Manter conectado neste navegador
+      </label>
+      <p class="login-erro" id="login-erro"></p>
+      <button type="submit" class="generate login-submit" id="login-submit">Entrar</button>
+    </form>
+
+    <form id="trocar-senha-form" class="login-form" hidden>
+      <p class="login-sub">Esta é uma senha provisória. Defina uma nova senha para continuar.</p>
+      <div class="field">
+        <label for="trocar-senha-nova">Nova senha</label>
+        <input type="password" id="trocar-senha-nova" autocomplete="new-password" required>
+      </div>
+      <div class="field">
+        <label for="trocar-senha-confirmar">Confirmar nova senha</label>
+        <input type="password" id="trocar-senha-confirmar" autocomplete="new-password" required>
+      </div>
+      <p class="login-erro" id="trocar-senha-erro"></p>
+      <button type="submit" class="generate login-submit" id="trocar-senha-submit">Definir nova senha</button>
+    </form>
+  </div>
+</div>
+
+<div class="sheet" id="app">
 
   <div class="masthead">
     <div>
@@ -540,6 +679,14 @@
       ABNT NBR 14725:2023<br>
       GHS Rev. 7
     </div>
+  </div>
+
+  <div class="auth-bar" id="auth-bar">
+    <span id="auth-bar-texto"></span>
+    <span class="auth-bar-actions">
+      <button type="button" class="link-button" id="btn-trocar-senha">Trocar senha</button>
+      <button type="button" class="link-button" id="btn-sair">Sair</button>
+    </span>
   </div>
 
   <div class="section">
@@ -573,41 +720,31 @@
       <span class="section-num">🏢</span>
       <h2 class="section-title">Dados do fornecedor</h2>
     </div>
-    <p class="section-hint">Ficam salvos como um "perfil" reaproveitável — selecione um perfil já salvo ou preencha os campos e clique em Salvar perfil. Estes dados vão para a Seção 1 da FDS.</p>
+    <p class="section-hint">Carregados automaticamente a partir do seu login — não ficam salvos neste navegador nem no repositório público. Vão para a Seção 1 da FDS.</p>
     <div class="field-grid">
       <div class="field full">
-        <label for="perfil-select">Perfil salvo</label>
-        <select id="perfil-select">
-          <option value="">— Novo perfil —</option>
-        </select>
+        <label>Razão social</label>
+        <p class="readonly-value" id="forn-razao-social">—</p>
+      </div>
+      <div class="field">
+        <label>CNPJ</label>
+        <p class="readonly-value" id="forn-cnpj">—</p>
+      </div>
+      <div class="field">
+        <label>Telefone</label>
+        <p class="readonly-value" id="forn-telefone">—</p>
       </div>
       <div class="field full">
-        <label for="emp-razao-social">Razão social<span class="req">*</span></label>
-        <input type="text" id="emp-razao-social" placeholder="Ex.: Minha Empresa Química Ltda.">
+        <label>Endereço</label>
+        <p class="readonly-value" id="forn-endereco">—</p>
       </div>
       <div class="field">
-        <label for="emp-cnpj">CNPJ</label>
-        <input type="text" id="emp-cnpj" placeholder="00.000.000/0001-00">
+        <label>E-mail</label>
+        <p class="readonly-value" id="forn-email">—</p>
       </div>
       <div class="field">
-        <label for="emp-telefone">Telefone</label>
-        <input type="text" id="emp-telefone" placeholder="(11) 0000-0000">
-      </div>
-      <div class="field full">
-        <label for="emp-endereco">Endereço</label>
-        <input type="text" id="emp-endereco" placeholder="Rua, número, cidade/UF">
-      </div>
-      <div class="field">
-        <label for="emp-email">E-mail</label>
-        <input type="text" id="emp-email" placeholder="contato@empresa.com.br">
-      </div>
-      <div class="field">
-        <label for="emp-telefone-emergencia">Telefone de emergência</label>
-        <input type="text" id="emp-telefone-emergencia" placeholder="0800-000-0000">
-      </div>
-      <div class="field full" style="flex-direction: row; gap: 10px;">
-        <button type="button" class="add-row" id="btn-salvar-perfil">Salvar perfil</button>
-        <button type="button" class="add-row" id="btn-excluir-perfil">Excluir perfil selecionado</button>
+        <label>Telefone de emergência</label>
+        <p class="readonly-value" id="forn-telefone-emergencia">—</p>
       </div>
     </div>
   </div>
@@ -794,7 +931,7 @@
   import { ViaExposicao, classificarTodasAsVias } from './js/motorToxicidadeAguda.js';
   import { classificarCorrosaoIrritacaoPele, classificarLesaoOcular } from './js/motorCorrosaoIrritacao.js';
   import { montarDadosFds, gerarPdfFds } from './js/geradorFds.js';
-  import { RepositorioPerfisEmpresa } from './js/perfisEmpresa.js';
+  import { auth } from './js/auth.js';
 
   const body = document.getElementById('comp-body');
 
@@ -812,7 +949,6 @@
   // --- Base de dados de substâncias (Anexo VI), em IndexedDB local ---
 
   const banco = new BancoSubstancias();
-  const repoPerfis = new RepositorioPerfisEmpresa();
 
   const campoAnexoViArquivo = document.getElementById('anexo-vi-arquivo');
   const campoAnexoViHeaderRow = document.getElementById('anexo-vi-header-row');
@@ -866,86 +1002,150 @@
     location.reload();
   });
 
-  // --- Perfis de empresa (Seção 1 — dados do fornecedor, reaproveitáveis) ---
+  // --- Autenticação e dados do fornecedor (Seção 1), vindos do login ---
 
-  const perfilSelect = document.getElementById('perfil-select');
-  const campoEmpRazaoSocial = document.getElementById('emp-razao-social');
-  const campoEmpCnpj = document.getElementById('emp-cnpj');
-  const campoEmpEndereco = document.getElementById('emp-endereco');
-  const campoEmpTelefone = document.getElementById('emp-telefone');
-  const campoEmpEmail = document.getElementById('emp-email');
-  const campoEmpTelefoneEmergencia = document.getElementById('emp-telefone-emergencia');
-  let perfisCarregados = [];
+  const loginOverlay = document.getElementById('login-overlay');
+  const loginForm = document.getElementById('login-form');
+  const loginUsuario = document.getElementById('login-usuario');
+  const loginSenha = document.getElementById('login-senha');
+  const loginLembrar = document.getElementById('login-lembrar');
+  const loginErro = document.getElementById('login-erro');
+  const loginSubmit = document.getElementById('login-submit');
 
-  function limparCamposEmpresa() {
-    campoEmpRazaoSocial.value = '';
-    campoEmpCnpj.value = '';
-    campoEmpEndereco.value = '';
-    campoEmpTelefone.value = '';
-    campoEmpEmail.value = '';
-    campoEmpTelefoneEmergencia.value = '';
-  }
+  const trocarSenhaForm = document.getElementById('trocar-senha-form');
+  const trocarSenhaNova = document.getElementById('trocar-senha-nova');
+  const trocarSenhaConfirmar = document.getElementById('trocar-senha-confirmar');
+  const trocarSenhaErro = document.getElementById('trocar-senha-erro');
+  const trocarSenhaSubmit = document.getElementById('trocar-senha-submit');
 
-  function preencherCamposEmpresa(perfil) {
-    campoEmpRazaoSocial.value = perfil.razao_social || '';
-    campoEmpCnpj.value = perfil.cnpj || '';
-    campoEmpEndereco.value = perfil.endereco || '';
-    campoEmpTelefone.value = perfil.telefone || '';
-    campoEmpEmail.value = perfil.email || '';
-    campoEmpTelefoneEmergencia.value = perfil.telefone_emergencia || '';
-  }
+  const appEl = document.getElementById('app');
+  const authBarTexto = document.getElementById('auth-bar-texto');
+  const btnSair = document.getElementById('btn-sair');
+  const btnTrocarSenhaAbrir = document.getElementById('btn-trocar-senha');
+
+  // Guardada só em memória pelo tempo da troca de senha obrigatória (nunca em disco).
+  let senhaAtualDigitada = '';
+  let dadosEmpresaAtual = null;
 
   function coletarDadosEmpresa() {
-    return {
-      razao_social: campoEmpRazaoSocial.value.trim(),
-      cnpj: campoEmpCnpj.value.trim(),
-      endereco: campoEmpEndereco.value.trim(),
-      telefone: campoEmpTelefone.value.trim(),
-      email: campoEmpEmail.value.trim(),
-      telefone_emergencia: campoEmpTelefoneEmergencia.value.trim(),
-    };
+    return dadosEmpresaAtual || {};
   }
 
-  function carregarPerfis(selecionarId) {
-    perfisCarregados = repoPerfis.listar();
-    perfilSelect.innerHTML = '<option value="">— Novo perfil —</option>' +
-      perfisCarregados.map(p => `<option value="${p.id}">${p.razao_social}</option>`).join('');
-    if (selecionarId) {
-      perfilSelect.value = selecionarId;
+  function preencherFornecedor(empresa) {
+    document.getElementById('forn-razao-social').textContent = empresa.razao_social || '—';
+    document.getElementById('forn-cnpj').textContent = empresa.cnpj || '—';
+    document.getElementById('forn-telefone').textContent = empresa.telefone || '—';
+    document.getElementById('forn-endereco').textContent = empresa.endereco || '—';
+    document.getElementById('forn-email').textContent = empresa.email || '—';
+    document.getElementById('forn-telefone-emergencia').textContent = empresa.telefone_emergencia || '—';
+    dadosEmpresaAtual = empresa;
+  }
+
+  function mostrarOverlayLogin() {
+    loginOverlay.classList.add('visible');
+    appEl.classList.remove('visible');
+  }
+
+  function mostrarFormularioLogin() {
+    trocarSenhaForm.hidden = true;
+    loginForm.hidden = false;
+    loginErro.textContent = '';
+    loginSenha.value = '';
+    loginUsuario.focus();
+  }
+
+  function mostrarFormularioTrocaSenha() {
+    loginForm.hidden = true;
+    trocarSenhaForm.hidden = false;
+    trocarSenhaErro.textContent = '';
+    trocarSenhaNova.value = '';
+    trocarSenhaConfirmar.value = '';
+    trocarSenhaNova.focus();
+  }
+
+  async function liberarApp(usuario) {
+    authBarTexto.textContent = `Logado como ${usuario.nome}`;
+    loginOverlay.classList.remove('visible');
+    appEl.classList.add('visible');
+    try {
+      const empresa = await auth.obterDadosEmpresa();
+      preencherFornecedor(empresa);
+    } catch (erro) {
+      document.getElementById('forn-razao-social').textContent =
+        'Não foi possível carregar os dados da empresa: ' + erro.message;
     }
   }
 
-  perfilSelect.addEventListener('change', () => {
-    const perfil = perfisCarregados.find(p => p.id === perfilSelect.value);
-    if (perfil) {
-      preencherCamposEmpresa(perfil);
-    } else {
-      limparCamposEmpresa();
+  loginForm.addEventListener('submit', async (evento) => {
+    evento.preventDefault();
+    loginErro.textContent = '';
+    loginSubmit.disabled = true;
+    loginSubmit.textContent = 'Entrando…';
+    try {
+      const usuarioDigitado = loginUsuario.value.trim();
+      const senhaDigitada = loginSenha.value;
+      const usuario = await auth.login(usuarioDigitado, senhaDigitada, loginLembrar.checked);
+      if (usuario.trocar_senha) {
+        senhaAtualDigitada = senhaDigitada;
+        mostrarFormularioTrocaSenha();
+      } else {
+        location.reload();
+      }
+    } catch (erro) {
+      loginErro.textContent = erro.message || 'Não foi possível entrar.';
+    } finally {
+      loginSubmit.disabled = false;
+      loginSubmit.textContent = 'Entrar';
     }
   });
 
-  document.getElementById('btn-salvar-perfil').addEventListener('click', () => {
-    const dadosEmpresa = coletarDadosEmpresa();
-    if (!dadosEmpresa.razao_social) {
-      alert('Informe a razão social antes de salvar o perfil.');
+  trocarSenhaForm.addEventListener('submit', async (evento) => {
+    evento.preventDefault();
+    trocarSenhaErro.textContent = '';
+    if (trocarSenhaNova.value.length < 10) {
+      trocarSenhaErro.textContent = 'A nova senha deve ter pelo menos 10 caracteres.';
       return;
     }
-    const perfilIdAtual = perfilSelect.value || null;
+    if (trocarSenhaNova.value !== trocarSenhaConfirmar.value) {
+      trocarSenhaErro.textContent = 'As senhas não coincidem.';
+      return;
+    }
+    trocarSenhaSubmit.disabled = true;
+    trocarSenhaSubmit.textContent = 'Salvando…';
     try {
-      const perfilSalvo = repoPerfis.salvar(dadosEmpresa, perfilIdAtual);
-      carregarPerfis(perfilSalvo.id);
+      await auth.trocarSenha(senhaAtualDigitada, trocarSenhaNova.value);
+      senhaAtualDigitada = '';
+      location.reload();
     } catch (erro) {
-      alert('Não foi possível salvar o perfil: ' + erro.message);
+      trocarSenhaErro.textContent = erro.message || 'Não foi possível trocar a senha.';
+    } finally {
+      trocarSenhaSubmit.disabled = false;
+      trocarSenhaSubmit.textContent = 'Definir nova senha';
     }
   });
 
-  document.getElementById('btn-excluir-perfil').addEventListener('click', () => {
-    const perfilIdAtual = perfilSelect.value;
-    if (!perfilIdAtual) return;
-    if (!confirm('Excluir este perfil de empresa salvo? Esta ação não afeta nenhuma FDS já gerada.')) return;
-    repoPerfis.excluir(perfilIdAtual);
-    limparCamposEmpresa();
-    carregarPerfis();
+  btnSair.addEventListener('click', () => {
+    auth.logout();
+    location.reload();
+  });
+
+  btnTrocarSenhaAbrir.addEventListener('click', () => {
+    const senhaAtual = prompt('Confirme sua senha atual:');
+    if (!senhaAtual) return;
+    const novaSenha = prompt('Nova senha (mínimo 10 caracteres):');
+    if (!novaSenha) return;
+    if (novaSenha.length < 10) {
+      alert('A nova senha deve ter pelo menos 10 caracteres.');
+      return;
+    }
+    const confirmarNovaSenha = prompt('Confirme a nova senha:');
+    if (novaSenha !== confirmarNovaSenha) {
+      alert('As senhas não coincidem.');
+      return;
+    }
+    auth.trocarSenha(senhaAtual, novaSenha)
+      .then(() => alert('Senha alterada com sucesso.'))
+      .catch((erro) => alert('Não foi possível trocar a senha: ' + erro.message));
   });
 
   // --- Campos adicionais (Seção 3 da tela — "poucos campos" opcionais) ---
@@ -1206,13 +1406,21 @@
   // --- Inicialização ---
 
   (async function iniciar() {
+    const logado = await auth.sessaoValidaAoCarregar();
+    if (!logado) {
+      mostrarFormularioLogin();
+      mostrarOverlayLogin();
+      return;
+    }
+
+    await liberarApp(auth.usuario);
+
     try {
       await banco.abrir();
       await atualizarStatusBase();
     } catch (erro) {
       mostrarErro('Não foi possível abrir a base de dados local (IndexedDB): ' + erro.message);
     }
-    carregarPerfis();
   })();
 </script>
 
